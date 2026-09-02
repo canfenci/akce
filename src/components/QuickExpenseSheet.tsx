@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { calculateMonthSummary, formatCurrency, getMonthKey } from '../domain/financeEngine';
 import { getMonthCalculationDate } from '../domain/month';
 import type { Expense } from '../domain/types';
@@ -26,7 +26,15 @@ export function QuickExpenseSheet({ open, onClose }: { open: boolean; onClose: (
     setAmount(''); setNote(''); setExpenseType('zorunlu'); onClose();
   };
 
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [open, onClose]);
+
   if (!open) return null;
+
   return <div className="sheet-layer" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="expense-title">
       <div className="sheet__handle" />

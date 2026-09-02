@@ -31,7 +31,7 @@ function FinanceApp() {
   const account = mode === 'local'
     ? { label: 'Yerel kullanım', detail: 'Veriler yalnızca bu cihazda', actionLabel: 'Giriş ekranına dön', onAction: leaveLocalMode }
     : { label: user?.displayName || 'Google hesabı', detail: user?.email || '', actionLabel: 'Çıkış yap', onAction: () => void signOut() };
-  const screen = page === 'home' ? <HomeScreen goTo={navigate} /> : page === 'expenses' ? <ExpensesScreen openQuick={() => setQuickOpen(true)} /> : page === 'budget' ? <BudgetScreen /> : page === 'investments' ? <InvestmentsScreen /> : page === 'assets' ? <AssetsScreen /> : page === 'coach' ? <CoachScreen /> : <SettingsScreen account={account} />;
+  const screen = page === 'home' ? <HomeScreen goTo={navigate} /> : page === 'expenses' ? <ExpensesScreen openQuick={() => setQuickOpen(true)} /> : page === 'budget' ? <BudgetScreen /> : page === 'investments' ? <InvestmentsScreen /> : page === 'assets' ? <AssetsScreen /> : page === 'coach' ? <CoachScreen /> : <SettingsScreen account={account} mode={mode} />;
 
   const syncFooter = mode === 'local'
     ? { title: 'Veriler cihazında', subtitle: 'Akçe V1 · Çevrimdışı hazır' }
