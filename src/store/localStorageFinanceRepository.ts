@@ -2,7 +2,7 @@ import { getMonthKey } from '../domain/financeEngine';
 import { isMonthKey } from '../domain/month';
 import type { CategoryBudget } from '../domain/types';
 import { seedData, type AkceData } from './seed';
-import type { FinanceRepository } from './financeRepository';
+import type { LocalFinanceRepository } from './financeRepository';
 
 export const storageKey = 'akce-v1-state';
 
@@ -37,7 +37,8 @@ export function migrateState(input: unknown, currentMonthKey: string = getMonthK
   };
 }
 
-export const localStorageFinanceRepository: FinanceRepository = {
+export const localStorageFinanceRepository: LocalFinanceRepository = {
+  kind: 'local',
   loadState(storage: Pick<Storage, 'getItem'> = localStorage): AkceData {
     try {
       const saved = storage.getItem(storageKey);
