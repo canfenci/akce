@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { coachProvider } from '../domain/coachEngine';
 import { calculateMonthSummary, formatCurrency, formatPercentage, getAssetProgress, getMonthKey, getTotalAssets, getTotalAssetTargets } from '../domain/financeEngine';
 import { formatMonthKey, getMonthCalculationDate, shiftMonthKey } from '../domain/month';
@@ -7,6 +7,7 @@ import { useAkceStore } from '../store/AkceStore';
 import { getIsDeviceTrusted, setIsDeviceTrusted } from '../store/devicePreference';
 import { Icon } from '../components/Icon';
 import { Progress } from '../components/Progress';
+import { useDialogSheet } from '../hooks/useDialogSheet';
 
 const titleCase = (value: string) => value.charAt(0).toLocaleUpperCase('tr-TR') + value.slice(1);
 
@@ -123,19 +124,20 @@ export function BudgetScreen({ initialTab = 'Genel Bakış' }: { initialTab?: Bu
   const [categoryLimit, setCategoryLimit] = useState('');
   const [categoryColor, setCategoryColor] = useState('');
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (incomeForm.isOpen) setIncomeForm({ isOpen: false, mode: 'add' });
-      else if (fixedForm.isOpen) setFixedForm({ isOpen: false, mode: 'add' });
-      else if (categoryForm.isOpen) setCategoryForm({ isOpen: false, mode: 'add' });
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [incomeForm.isOpen, fixedForm.isOpen, categoryForm.isOpen]);
+  const [incomeError, setIncomeError] = useState('');
+  const [fixedError, setFixedError] = useState('');
+  const [categoryError, setCategoryError] = useState('');
+
+  const closeIncomeForm = () => { setIncomeForm({ isOpen: false, mode: 'add' }); setIncomeError(''); };
+  const closeFixedForm = () => { setFixedForm({ isOpen: false, mode: 'add' }); setFixedError(''); };
+  const closeCategoryForm = () => { setCategoryForm({ isOpen: false, mode: 'add' }); setCategoryError(''); };
+
+  const incomeSheetRef = useDialogSheet(incomeForm.isOpen, closeIncomeForm);
+  const fixedSheetRef = useDialogSheet(fixedForm.isOpen, closeFixedForm);
+  const categorySheetRef = useDialogSheet(categoryForm.isOpen, closeCategoryForm);
 
   const openAddIncome = () => {
-    setIncomeName(''); setIncomeAmount(''); setIncomeRecurring(true);
+    setIncomeName(''); setIncomeAmount(''); setIncomeRecurring(true); setIncomeError('');
     setIncomeForm({ isOpen: true, mode: 'add' });
   };
 
@@ -143,19 +145,21 @@ export function BudgetScreen({ initialTab = 'Genel Bakış' }: { initialTab?: Bu
     setIncomeName(income.name);
     setIncomeAmount(String(income.amount));
     setIncomeRecurring(income.recurring);
+    setIncomeError('');
     setIncomeForm({ isOpen: true, mode: 'edit', currentIncome: income });
   };
 
   const saveIncome = () => {
     const amount = Number(incomeAmount);
-    if (!incomeName.trim() || !Number.isFinite(amount) || amount <= 0) return;
+    if (!incomeName.trim()) { setIncomeError('Ad boş olamaz.'); return; }
+    if (!Number.isFinite(amount) || amount <= 0) { setIncomeError('Tutar 0\'dan büyük olmalı.'); return; }
     const now = Date.now();
     if (incomeForm.mode === 'edit' && incomeForm.currentIncome) {
       dispatch({ type: 'UPDATE_INCOME', payload: { ...incomeForm.currentIncome, name: incomeName.trim(), amount, recurring: incomeRecurring, updatedAt: now } });
     } else {
       dispatch({ type: 'ADD_INCOME', payload: { id: crypto.randomUUID(), name: incomeName.trim(), amount, date: `${state.selectedMonthKey}-01`, recurring: incomeRecurring, active: true, monthKey: state.selectedMonthKey, createdAt: now, updatedAt: now, userId: 'local-user' } });
     }
-    setIncomeForm({ isOpen: false, mode: 'add' });
+    setIncomeForm({ isOpen: false, mode: 'add' }); setIncomeError('');
   };
 
   const deleteIncome = (id: string) => dispatch({ type: 'DELETE_INCOME', id });
@@ -164,7 +168,7 @@ export function BudgetScreen({ initialTab = 'Genel Bakış' }: { initialTab?: Bu
 
   const openAddFixed = () => {
     setFixedName(''); setFixedAmount(''); setFixedDueDay('1');
-    setFixedCategory(uniqueCategories[0] ?? 'Fatura'); setFixedFrequency('monthly');
+    setFixedCategory(uniqueCategories[0] ?? 'Fatura'); setFixedFrequency('monthly'); setFixedError('');
     setFixedForm({ isOpen: true, mode: 'add' });
   };
 
@@ -174,26 +178,30 @@ export function BudgetScreen({ initialTab = 'Genel Bakış' }: { initialTab?: Bu
     setFixedDueDay(String(expense.dueDay));
     setFixedCategory(expense.category);
     setFixedFrequency(expense.frequency);
+    setFixedError('');
     setFixedForm({ isOpen: true, mode: 'edit', currentFixedExpense: expense });
   };
 
   const saveFixed = () => {
     const amount = Number(fixedAmount);
-    const dueDay = Math.min(31, Math.max(1, Number(fixedDueDay) || 1));
-    if (!fixedName.trim() || !Number.isFinite(amount) || amount <= 0) return;
+    const dueDay = Number(fixedDueDay) || 0;
+    if (!fixedName.trim()) { setFixedError('Ad boş olamaz.'); return; }
+    if (!Number.isFinite(amount) || amount <= 0) { setFixedError('Tutar 0\'dan büyük olmalı.'); return; }
+    if (!Number.isFinite(dueDay) || dueDay < 1 || dueDay > 31) { setFixedError('Ödeme günü 1–31 arasında olmalı.'); return; }
+    const clampedDueDay = Math.min(31, Math.max(1, dueDay));
     const now = Date.now();
     if (fixedForm.mode === 'edit' && fixedForm.currentFixedExpense) {
-      dispatch({ type: 'UPDATE_FIXED_EXPENSE', payload: { ...fixedForm.currentFixedExpense, name: fixedName.trim(), amount, dueDay, category: fixedCategory, frequency: fixedFrequency, updatedAt: now } });
+      dispatch({ type: 'UPDATE_FIXED_EXPENSE', payload: { ...fixedForm.currentFixedExpense, name: fixedName.trim(), amount, dueDay: clampedDueDay, category: fixedCategory, frequency: fixedFrequency, updatedAt: now } });
     } else {
-      dispatch({ type: 'ADD_FIXED_EXPENSE', payload: { id: crypto.randomUUID(), name: fixedName.trim(), amount, dueDay, category: fixedCategory, frequency: fixedFrequency, active: true, monthKey: state.selectedMonthKey, createdAt: now, updatedAt: now, userId: 'local-user' } });
+      dispatch({ type: 'ADD_FIXED_EXPENSE', payload: { id: crypto.randomUUID(), name: fixedName.trim(), amount, dueDay: clampedDueDay, category: fixedCategory, frequency: fixedFrequency, active: true, monthKey: state.selectedMonthKey, createdAt: now, updatedAt: now, userId: 'local-user' } });
     }
-    setFixedForm({ isOpen: false, mode: 'add' });
+    setFixedForm({ isOpen: false, mode: 'add' }); setFixedError('');
   };
 
   const deleteFixed = (id: string) => dispatch({ type: 'DELETE_FIXED_EXPENSE', id });
 
   const openAddCategory = () => {
-    setCategoryName(''); setCategoryLimit(''); setCategoryColor('#538b67');
+    setCategoryName(''); setCategoryLimit(''); setCategoryColor('#538b67'); setCategoryError('');
     setCategoryForm({ isOpen: true, mode: 'add' });
   };
 
@@ -201,12 +209,14 @@ export function BudgetScreen({ initialTab = 'Genel Bakış' }: { initialTab?: Bu
     setCategoryName(category.name);
     setCategoryLimit(String(category.limit));
     setCategoryColor(category.color);
+    setCategoryError('');
     setCategoryForm({ isOpen: true, mode: 'edit', currentCategory: category });
   };
 
   const saveCategory = () => {
     const limit = Number(categoryLimit);
-    if (!categoryName.trim() || !Number.isFinite(limit) || limit < 0) return;
+    if (!categoryName.trim()) { setCategoryError('Ad boş olamaz.'); return; }
+    if (!Number.isFinite(limit) || limit < 0) { setCategoryError('Limit 0 veya daha büyük olmalı.'); return; }
     const payload: CategoryBudget = {
       id: categoryForm.mode === 'edit' && categoryForm.currentCategory ? categoryForm.currentCategory.id : crypto.randomUUID(),
       name: categoryName.trim(),
@@ -215,7 +225,7 @@ export function BudgetScreen({ initialTab = 'Genel Bakış' }: { initialTab?: Bu
       monthKey: state.selectedMonthKey,
     };
     dispatch({ type: categoryForm.mode === 'edit' ? 'UPDATE_CATEGORY_BUDGET' : 'ADD_CATEGORY_BUDGET', payload });
-    setCategoryForm({ isOpen: false, mode: 'add' });
+    setCategoryForm({ isOpen: false, mode: 'add' }); setCategoryError('');
   };
 
   const deleteCategory = (id: string) => dispatch({ type: 'DELETE_CATEGORY_BUDGET', id });
@@ -230,37 +240,40 @@ export function BudgetScreen({ initialTab = 'Genel Bakış' }: { initialTab?: Bu
     {tab === 'Otomatik Giderler' && <section className="data-card"><button className="add-inline" onClick={openAddFixed}><Icon name="plus" /> Yeni otomatik gider</button><div className="data-card__header"><b>Otomatik ödemeler</b><span>Aktif giderler bütçeden ayrılır</span></div>{monthFixedExpenses.map(item => <div className={`data-row ${item.active ? '' : 'muted-row'}`} key={item.id}><span className="date-badge">{item.dueDay}<small>GÜN</small></span><span className="data-row__main"><b>{item.name}</b><small>{item.category}</small></span><strong>{formatCurrency(item.amount)}</strong><button className="delete-button" onClick={() => openEditFixed(item)} aria-label="Gideri düzenle"><Icon name="edit" /></button><button className="delete-button" onClick={() => deleteFixed(item.id)} aria-label="Gideri sil"><Icon name="trash" /></button><button className={`switch ${item.active ? 'active' : ''}`} aria-label={`${item.name} durumunu değiştir`} onClick={() => dispatch({ type: 'TOGGLE_FIXED', id: item.id })}><span /></button></div>)}</section>}
     {tab === 'Kategoriler' && <section className="category-grid"><button className="add-inline" onClick={openAddCategory}><Icon name="plus" /> Yeni kategori</button>{monthCategoryBudgets.map(cat => { const spent = state.expenses.filter(e => e.monthKey === state.selectedMonthKey && e.category === cat.name).reduce((sum, e) => sum + e.amount, 0); return (<div key={cat.id} className="category-card-wrapper"><article className="category-card"><div><span className="category-dot" style={{ background: cat.color }}/><b>{cat.name}</b><strong>{Math.round(spent / cat.limit * 100)}%</strong></div><h3>{formatCurrency(cat.limit - spent)}</h3><p>{formatCurrency(spent)} harcandı · {formatCurrency(cat.limit)} limit</p><Progress value={spent / cat.limit * 100} /></article><div className="category-actions"><button className="delete-button" onClick={() => openEditCategory(cat)} aria-label="Kategoriyi düzenle"><Icon name="edit" /></button><button className="delete-button" onClick={() => deleteCategory(cat.id)} aria-label="Kategoriyi sil"><Icon name="trash" /></button></div></div>); })}</section>}
 
-    {incomeForm.isOpen && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setIncomeForm({ isOpen: false, mode: 'add' }); }}>
-      <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="income-title">
+    {incomeForm.isOpen && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) closeIncomeForm(); }}>
+      <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="income-title" ref={incomeSheetRef}>
         <div className="sheet__handle" />
-        <header className="sheet__header"><div><span className="eyebrow">GELİR</span><h2 id="income-title">{incomeForm.mode === 'add' ? 'Yeni gelir' : 'Geliri düzenle'}</h2></div><button className="icon-button" onClick={() => setIncomeForm({ isOpen: false, mode: 'add' })} aria-label="Kapat"><Icon name="close" /></button></header>
-        <label className="field">Ad <input value={incomeName} onChange={e => setIncomeName(e.target.value)} placeholder="Örn: Maaş" /></label>
-        <label className="amount-input"><span>Tutar</span><div><input inputMode="decimal" value={incomeAmount} onChange={e => setIncomeAmount(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="0" aria-label="Gelir tutarı" /><b>TL</b></div></label>
+        <header className="sheet__header"><div><span className="eyebrow">GELİR</span><h2 id="income-title">{incomeForm.mode === 'add' ? 'Yeni gelir' : 'Geliri düzenle'}</h2></div><button className="icon-button" onClick={closeIncomeForm} aria-label="Kapat"><Icon name="close" /></button></header>
+        <label className="field">Ad <input value={incomeName} onChange={e => { setIncomeName(e.target.value); setIncomeError(''); }} placeholder="Örn: Maaş" /></label>
+        <label className="amount-input"><span>Tutar</span><div><input inputMode="decimal" value={incomeAmount} onChange={e => { setIncomeAmount(e.target.value.replace(/[^0-9.]/g, '')); setIncomeError(''); }} placeholder="0" aria-label="Gelir tutarı" /><b>TL</b></div></label>
         <label className="field"><input type="checkbox" checked={incomeRecurring} onChange={e => setIncomeRecurring(e.target.checked)} /> Her ay tekrarlanan gelir</label>
-        <button className="primary-button" disabled={!incomeName.trim() || Number(incomeAmount) <= 0} onClick={saveIncome}>{incomeForm.mode === 'add' ? 'Geliri kaydet' : 'Güncelle'}</button>
+        {incomeError && <p className="form-error">{incomeError}</p>}
+        <button className="primary-button" onClick={saveIncome}>{incomeForm.mode === 'add' ? 'Geliri kaydet' : 'Güncelle'}</button>
       </section>
     </div>}
 
-    {fixedForm.isOpen && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setFixedForm({ isOpen: false, mode: 'add' }); }}>
-      <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="fixed-title">
+    {fixedForm.isOpen && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) closeFixedForm(); }}>
+      <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="fixed-title" ref={fixedSheetRef}>
         <div className="sheet__handle" />
-        <header className="sheet__header"><div><span className="eyebrow">OTOMATİK GİDER</span><h2 id="fixed-title">{fixedForm.mode === 'add' ? 'Yeni otomatik gider' : 'Gideri düzenle'}</h2></div><button className="icon-button" onClick={() => setFixedForm({ isOpen: false, mode: 'add' })} aria-label="Kapat"><Icon name="close" /></button></header>
-        <label className="field">Ad <input value={fixedName} onChange={e => setFixedName(e.target.value)} placeholder="Örn: Netflix" /></label>
-        <label className="amount-input"><span>Tutar</span><div><input inputMode="decimal" value={fixedAmount} onChange={e => setFixedAmount(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="0" aria-label="Gider tutarı" /><b>TL</b></div></label>
-        <div className="form-grid"><label>Gün (1-31) <input inputMode="numeric" value={fixedDueDay} onChange={e => setFixedDueDay(e.target.value.replace(/[^0-9]/g, ''))} /></label><label>Kategori<select value={fixedCategory} onChange={e => setFixedCategory(e.target.value)}>{uniqueCategories.map(c => <option key={c}>{c}</option>)}</select></label></div>
+        <header className="sheet__header"><div><span className="eyebrow">OTOMATİK GİDER</span><h2 id="fixed-title">{fixedForm.mode === 'add' ? 'Yeni otomatik gider' : 'Gideri düzenle'}</h2></div><button className="icon-button" onClick={closeFixedForm} aria-label="Kapat"><Icon name="close" /></button></header>
+        <label className="field">Ad <input value={fixedName} onChange={e => { setFixedName(e.target.value); setFixedError(''); }} placeholder="Örn: Netflix" /></label>
+        <label className="amount-input"><span>Tutar</span><div><input inputMode="decimal" value={fixedAmount} onChange={e => { setFixedAmount(e.target.value.replace(/[^0-9.]/g, '')); setFixedError(''); }} placeholder="0" aria-label="Gider tutarı" /><b>TL</b></div></label>
+        <div className="form-grid"><label>Gün (1-31) <input inputMode="numeric" value={fixedDueDay} onChange={e => { setFixedDueDay(e.target.value.replace(/[^0-9]/g, '')); setFixedError(''); }} /></label><label>Kategori<select value={fixedCategory} onChange={e => setFixedCategory(e.target.value)}>{uniqueCategories.map(c => <option key={c}>{c}</option>)}</select></label></div>
         <fieldset className="segmented"><legend>Sıklık</legend>{(['monthly', 'yearly'] as const).map(value => <button type="button" key={value} className={fixedFrequency === value ? 'active' : ''} onClick={() => setFixedFrequency(value)}>{value === 'monthly' ? 'Aylık' : 'Yıllık'}</button>)}</fieldset>
-        <button className="primary-button" disabled={!fixedName.trim() || Number(fixedAmount) <= 0} onClick={saveFixed}>{fixedForm.mode === 'add' ? 'Gideri kaydet' : 'Güncelle'}</button>
+        {fixedError && <p className="form-error">{fixedError}</p>}
+        <button className="primary-button" onClick={saveFixed}>{fixedForm.mode === 'add' ? 'Gideri kaydet' : 'Güncelle'}</button>
       </section>
 </div>}
 
-    {categoryForm.isOpen && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setCategoryForm({ isOpen: false, mode: 'add' }); }}>
-      <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="category-title">
+    {categoryForm.isOpen && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) closeCategoryForm(); }}>
+      <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="category-title" ref={categorySheetRef}>
         <div className="sheet__handle" />
-        <header className="sheet__header"><div><span className="eyebrow">KATEGORİ BÜTÇESİ</span><h2 id="category-title">{categoryForm.mode === 'add' ? 'Yeni kategori bütçesi' : 'Kategori bütçesini düzenle'}</h2></div><button className="icon-button" onClick={() => setCategoryForm({ isOpen: false, mode: 'add' })} aria-label="Kapat"><Icon name="close" /></button></header>
-        <label className="field">Ad <input value={categoryName} onChange={e => setCategoryName(e.target.value)} placeholder="Örn: Market" /></label>
-        <label className="amount-input"><span>Limit</span><div><input inputMode="decimal" value={categoryLimit} onChange={e => setCategoryLimit(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="0" aria-label="Kategori limiti" /><b>TL</b></div></label>
+        <header className="sheet__header"><div><span className="eyebrow">KATEGORİ BÜTÇESİ</span><h2 id="category-title">{categoryForm.mode === 'add' ? 'Yeni kategori bütçesi' : 'Kategori bütçesini düzenle'}</h2></div><button className="icon-button" onClick={closeCategoryForm} aria-label="Kapat"><Icon name="close" /></button></header>
+        <label className="field">Ad <input value={categoryName} onChange={e => { setCategoryName(e.target.value); setCategoryError(''); }} placeholder="Örn: Market" /></label>
+        <label className="amount-input"><span>Limit</span><div><input inputMode="decimal" value={categoryLimit} onChange={e => { setCategoryLimit(e.target.value.replace(/[^0-9.]/g, '')); setCategoryError(''); }} placeholder="0" aria-label="Kategori limiti" /><b>TL</b></div></label>
         <label className="field">Renk <input value={categoryColor} onChange={e => setCategoryColor(e.target.value)} placeholder="#538b67" /></label>
-        <button className="primary-button" disabled={!categoryName.trim() || !Number.isFinite(Number(categoryLimit)) || Number(categoryLimit) < 0} onClick={saveCategory}>{categoryForm.mode === 'add' ? 'Kategori kaydet' : 'Güncelle'}</button>
+        {categoryError && <p className="form-error">{categoryError}</p>}
+        <button className="primary-button" onClick={saveCategory}>{categoryForm.mode === 'add' ? 'Kategori kaydet' : 'Güncelle'}</button>
       </section>
     </div>}
   </div>
@@ -293,21 +306,17 @@ export function AssetsScreen() {
     if (!Number.isFinite(tgt) || tgt <= 0) { setFormError('Hedef tutar 0\'dan büyük olmalı.'); return; }
     if (!assetForm.currentAsset) return;
     dispatch({ type: 'UPDATE_ASSET', id: assetForm.currentAsset.id, amount: cur, targetAmount: tgt });
-    setAssetForm({ isOpen: false });
+    closeAssetForm();
   };
 
-  useEffect(() => {
-    if (!assetForm.isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') setAssetForm({ isOpen: false }); };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [assetForm.isOpen]);
+  const closeAssetForm = () => { setAssetForm({ isOpen: false }); setFormError(''); };
+  const assetSheetRef = useDialogSheet(assetForm.isOpen, closeAssetForm);
 
   return <div className="screen"><PageHeader eyebrow="ÖZGÜRLÜK KASASI" title="Varlıklar & Hedefler" description="Finansal özgürlüğe olan mesafeni görünür kıl." /><section className="assets-hero"><span>TOPLAM FİNANSAL VARLIK</span><strong>{formatCurrency(total)}</strong><p>Genel hedef: {formatCurrency(target)}</p><Progress value={total / target * 100} tone="gold"/><small>%{Math.round(total / target * 100)} tamamlandı · {formatCurrency(target - total)} kaldı</small></section><section className="asset-grid">{state.assets.map(asset => { const progress = getAssetProgress(asset); return <article className="asset-card" key={asset.id}><header><span className="asset-monogram">{asset.group.slice(0, 2).toLocaleUpperCase('tr-TR')}</span><div><b>{asset.group}</b><small>Hedefin %{Math.round(progress)}'i</small></div></header><h3>{formatCurrency(asset.currentAmount)}</h3><p>{formatCurrency(asset.targetAmount)} hedef</p><Progress value={progress} tone="gold"/><div><span>Hedefe kalan</span><b>{formatCurrency(Math.max(0, asset.targetAmount - asset.currentAmount))}</b></div><button onClick={() => openAssetEdit(asset)}>Düzenle</button></article>; })}</section>
-    {assetForm.isOpen && assetForm.currentAsset && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setAssetForm({ isOpen: false }); }}>
-      <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="asset-edit-title">
+    {assetForm.isOpen && assetForm.currentAsset && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) closeAssetForm(); }}>
+      <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="asset-edit-title" ref={assetSheetRef}>
         <div className="sheet__handle" />
-        <header className="sheet__header"><div><span className="eyebrow">VARLIK DÜZENLE</span><h2 id="asset-edit-title">{assetForm.currentAsset.group}</h2></div><button className="icon-button" onClick={() => setAssetForm({ isOpen: false })} aria-label="Kapat"><Icon name="close" /></button></header>
+        <header className="sheet__header"><div><span className="eyebrow">VARLIK DÜZENLE</span><h2 id="asset-edit-title">{assetForm.currentAsset.group}</h2></div><button className="icon-button" onClick={closeAssetForm} aria-label="Kapat"><Icon name="close" /></button></header>
         <label className="amount-input"><span>Mevcut tutar</span><div><input autoFocus inputMode="decimal" value={currentAmount} onChange={e => { setCurrentAmount(e.target.value.replace(/[^0-9.]/g, '')); setFormError(''); }} placeholder="0" aria-label="Mevcut tutar"/><b>TL</b></div></label>
         <label className="amount-input"><span>Hedef tutar</span><div><input inputMode="decimal" value={targetAmount} onChange={e => { setTargetAmount(e.target.value.replace(/[^0-9.]/g, '')); setFormError(''); }} placeholder="0" aria-label="Hedef tutar"/><b>TL</b></div></label>
         {formError && <p className="form-error">{formError}</p>}
