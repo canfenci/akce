@@ -1,10 +1,10 @@
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import { AkceStoreProvider } from './store/AkceStore';
+import { AuthProvider } from './auth/AuthProvider';
 import './styles/global.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <AkceStoreProvider><App /></AkceStoreProvider>
+  <AuthProvider><App /></AuthProvider>
 );
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {

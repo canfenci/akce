@@ -12,6 +12,7 @@ coverage/
 # Environment and local overrides
 .env
 .env.*
+!.env.example
 *.local
 
 # Tooling and editor files
