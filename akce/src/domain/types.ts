@@ -1,0 +1,125 @@
+export interface Expense {
+  id: string;
+  amount: number;
+  category: string;
+  type: 'zorunlu' | 'isteğe bağlı' | 'plansız';
+  paymentMethod: 'kart' | 'nakit';
+  note?: string;
+  date: string;
+  monthKey: string;
+  createdAt: number;
+  updatedAt: number;
+  userId: string;
+}
+
+export interface Income {
+  id: string;
+  name: string;
+  amount: number;
+  date: string;
+  recurring: boolean;
+  active: boolean;
+  monthKey: string;
+  createdAt: number;
+  updatedAt: number;
+  userId: string;
+}
+
+export interface FixedExpense {
+  id: string;
+  name: string;
+  amount: number;
+  dueDay: number;
+  category: string;
+  frequency: 'monthly' | 'yearly';
+  active: boolean;
+  monthKey: string;
+  createdAt: number;
+  updatedAt: number;
+  userId: string;
+}
+
+export interface Investment {
+  id: string;
+  group: 'TEFAS' | 'Nasdaq' | 'Altın' | 'Gümüş' | 'BES';
+  plannedAmount: number;
+  actualAmount: number;
+  completed: boolean;
+  completedDate?: string;
+  note?: string;
+  monthKey: string;
+  createdAt: number;
+  updatedAt: number;
+  userId: string;
+}
+
+export interface Asset {
+  id: string;
+  group: 'TEFAS' | 'Nasdaq' | 'Altın' | 'Gümüş' | 'BES';
+  currentAmount: number;
+  targetAmount: number;
+  createdAt: number;
+  updatedAt: number;
+  userId: string;
+}
+
+export interface Goal {
+  id: string;
+  assetGroupId: string;
+  targetAmount: number;
+  createdAt: number;
+  updatedAt: number;
+  userId: string;
+}
+
+export interface CoachInsight {
+  id: string;
+  message: string;
+  type: 'info' | 'warning' | 'success';
+  metrics: {
+    dailyLimit: number;
+    sevenDayAverage: number;
+    remainingBudget: number;
+    daysLeft: number;
+    monthlyTempo: number;
+    unplannedRatio: number;
+    tefasProgress: number;
+  };
+  createdAt: number;
+  userId: string;
+}
+
+export interface MonthSummary {
+  monthKey: string;
+  totalIncome: number;
+  totalFixedInvestment: number;
+  totalAutomaticExpenses: number;
+  totalVariableExpenses: number;
+  remainingBudget: number;
+  daysLeft: number;
+  dailySafeLimit: number;
+  monthProgress: number;
+  budgetConsumptionRate: number;
+  threeDayAverage: number;
+  sevenDayAverage: number;
+  unplannedRatio: number;
+  monthEndEstimate: number;
+  investmentPlanRealizationRate: number;
+}
+
+export interface UserProfile {
+  uid: string;
+  displayName?: string;
+  email?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface UserSettings {
+  userId: string;
+  currency: string;
+  monthStartDay: number;
+  showOnboarding: boolean;
+  createdAt: number;
+  updatedAt: number;
+}

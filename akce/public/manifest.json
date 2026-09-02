@@ -1,0 +1,20 @@
+{
+  "name": "AKÇE",
+  "short_name": "AKÇE",
+  "description": "Finansal Disiplin ve Özgürlük Uygulaması",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f1e8",
+  "theme_color": "#1a4731",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["finance"],
+  "lang": "tr"
+}
