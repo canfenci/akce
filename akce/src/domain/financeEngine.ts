@@ -29,7 +29,7 @@ export function calculateMonthSummary(
   fixedExpenses: FixedExpense[],
   investments: Investment[],
   expenses: Expense[],
-  assets: Asset[],
+  _assets: Asset[],
   currentDate: Date = new Date()
 ): MonthSummary {
   const monthKey = getMonthKey(currentDate);
