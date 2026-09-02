@@ -1,4 +1,4 @@
-import { collection, deleteDoc, doc, onSnapshot, serverTimestamp, setDoc, updateDoc, writeBatch, type DocumentData } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, serverTimestamp, setDoc, updateDoc, writeBatch, type DocumentData } from 'firebase/firestore';
 import { getFirebaseFirestore, type FirestoreCacheMode } from '../firebase/firebaseFirestore';
 
 export interface GatewayDocument {
@@ -13,6 +13,8 @@ export type GatewayBatchOperation =
 
 export interface FirestoreGateway {
   subscribeCollection(path: string, onDocuments: (documents: GatewayDocument[]) => void, onError: (error: unknown) => void): () => void;
+  getDocument?(path: string): Promise<GatewayDocument | null>;
+  getDocuments?(path: string): Promise<GatewayDocument[]>;
   setDocument(path: string, data: Record<string, unknown>, merge?: boolean): Promise<void>;
   updateDocument(path: string, data: Record<string, unknown>): Promise<void>;
   deleteDocument(path: string): Promise<void>;
@@ -25,6 +27,15 @@ export function createFirestoreGateway(cacheMode: FirestoreCacheMode = 'memory')
   return {
     subscribeCollection(path, onDocuments, onError) {
       return onSnapshot(collection(firestore, path), snapshot => onDocuments(snapshot.docs.map(item => ({ id: item.id, data: item.data() }))), onError);
+    },
+    async getDocument(path) {
+      const snapshot = await getDoc(doc(firestore, path));
+      if (!snapshot.exists()) return null;
+      return { id: snapshot.id, data: snapshot.data() as Record<string, unknown> };
+    },
+    async getDocuments(path) {
+      const snapshot = await getDocs(collection(firestore, path));
+      return snapshot.docs.map(item => ({ id: item.id, data: item.data() as Record<string, unknown> }));
     },
     async setDocument(path, data, merge = false) {
       await setDoc(doc(firestore, path), data as DocumentData, { merge });

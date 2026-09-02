@@ -20,7 +20,7 @@ function Onboarding() {
 }
 
 function FinanceApp() {
-  const { state } = useAkceStore();
+  const { state, syncStatus } = useAkceStore();
   const { mode, user, signOut, leaveLocalMode } = useAuth();
   const [page, setPage] = useState<Page>('home');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -32,8 +32,23 @@ function FinanceApp() {
     ? { label: 'Yerel kullanım', detail: 'Veriler yalnızca bu cihazda', actionLabel: 'Giriş ekranına dön', onAction: leaveLocalMode }
     : { label: user?.displayName || 'Google hesabı', detail: user?.email || '', actionLabel: 'Çıkış yap', onAction: () => void signOut() };
   const screen = page === 'home' ? <HomeScreen goTo={navigate} /> : page === 'expenses' ? <ExpensesScreen openQuick={() => setQuickOpen(true)} /> : page === 'budget' ? <BudgetScreen /> : page === 'investments' ? <InvestmentsScreen /> : page === 'assets' ? <AssetsScreen /> : page === 'coach' ? <CoachScreen /> : <SettingsScreen account={account} />;
+
+  const syncFooter = mode === 'local'
+    ? { title: 'Veriler cihazında', subtitle: 'Akçe V1 · Çevrimdışı hazır' }
+    : syncStatus === 'migrating'
+    ? { title: 'Aktarılıyor…', subtitle: 'Bulut eşitlemesi yapılıyor' }
+    : syncStatus === 'syncing'
+    ? { title: 'Senkronize ediliyor…', subtitle: 'Bulut güncelleniyor' }
+    : syncStatus === 'synced'
+    ? { title: 'Senkronize edildi', subtitle: 'Bulut korumalı' }
+    : syncStatus === 'offline'
+    ? { title: 'Çevrimdışı', subtitle: 'Bağlantı bekleniyor' }
+    : syncStatus === 'error'
+    ? { title: 'Senkronizasyon hatası', subtitle: 'Yeniden denenecek' }
+    : { title: 'Bulut hazır', subtitle: 'Eşitleme hazır' };
+
   return <div className="app-shell">
-    <aside className="sidebar"><div className="wordmark">akçe<span>.</span></div><p className="sidebar__tagline">Az özellik.<br/>Çok disiplin.</p><nav>{navItems.map(item => <button key={item.id} className={page === item.id ? 'active' : ''} onClick={() => setPage(item.id)}><Icon name={item.icon}/><span>{item.label}</span>{page === item.id && <i/>}</button>)}</nav><div className="sidebar__footer"><span className="sidebar__pulse"/><div><b>Veriler cihazında</b><small>Akçe V1 · Çevrimdışı hazır</small></div></div></aside>
+    <aside className="sidebar"><div className="wordmark">akçe<span>.</span></div><p className="sidebar__tagline">Az özellik.<br/>Çok disiplin.</p><nav>{navItems.map(item => <button key={item.id} className={page === item.id ? 'active' : ''} onClick={() => setPage(item.id)}><Icon name={item.icon}/><span>{item.label}</span>{page === item.id && <i/>}</button>)}</nav><div className="sidebar__footer"><span className="sidebar__pulse"/><div><b>{syncFooter.title}</b><small>{syncFooter.subtitle}</small></div></div></aside>
     <header className="mobile-header"><button className="icon-button" onClick={() => setMenuOpen(true)} aria-label="Menüyü aç"><Icon name="menu"/></button><div className="wordmark">akçe<span>.</span></div><button className="avatar" aria-label="Profil">MB</button></header>
     <main>{screen}</main>
     <nav className="bottom-nav">
