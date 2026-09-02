@@ -5,6 +5,7 @@ import type { Expense } from '../domain/types';
 import { useAkceStore } from '../store/AkceStore';
 import { Icon } from './Icon';
 import { useDialogSheet } from '../hooks/useDialogSheet';
+import { useVisualViewportHeight } from '../hooks/useVisualViewportHeight';
 
 export function QuickExpenseSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { state, dispatch } = useAkceStore();
@@ -24,6 +25,8 @@ export function QuickExpenseSheet({ open, onClose }: { open: boolean; onClose: (
   const hasCategories = monthCategories.length > 0;
 
   const sheetRef = useDialogSheet(open, onClose);
+  const viewportHeight = useVisualViewportHeight();
+  const sheetMaxHeight = viewportHeight > 0 ? `${Math.floor(viewportHeight * 0.94)}px` : '94vh';
 
   const save = () => {
     if (numericAmount <= 0) { setFormError('Tutar 0\'dan büyük olmalı.'); return; }
@@ -37,7 +40,7 @@ export function QuickExpenseSheet({ open, onClose }: { open: boolean; onClose: (
   if (!open) return null;
 
   return <div className="sheet-layer" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
-    <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="expense-title" ref={sheetRef}>
+    <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="expense-title" ref={sheetRef} style={{ maxHeight: sheetMaxHeight }}>
       <div className="sheet__handle" />
       <header className="sheet__header"><div><span className="eyebrow">YAŞAM KASASI</span><h2 id="expense-title">Hızlı harcama</h2></div><button className="icon-button" onClick={onClose} aria-label="Kapat"><Icon name="close" /></button></header>
       <label className="amount-input"><span>Tutar</span><div><input autoFocus inputMode="decimal" value={amount} onChange={event => { setAmount(event.target.value.replace(/[^0-9.]/g, '')); setFormError(''); }} placeholder="0" aria-label="Harcama tutarı"/><b>TL</b></div></label>

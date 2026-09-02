@@ -8,6 +8,7 @@ import { getIsDeviceTrusted, setIsDeviceTrusted } from '../store/devicePreferenc
 import { Icon } from '../components/Icon';
 import { Progress } from '../components/Progress';
 import { useDialogSheet } from '../hooks/useDialogSheet';
+import { useVisualViewportHeight } from '../hooks/useVisualViewportHeight';
 
 const CATEGORY_COLORS = ['#538b67', '#bd8b2e', '#9a6548', '#707771', '#a74737', '#4a6fa5'];
 const titleCase = (value: string) => value.charAt(0).toLocaleUpperCase('tr-TR') + value.slice(1);
@@ -136,6 +137,8 @@ export function BudgetScreen({ initialTab = 'Genel Bakış' }: { initialTab?: Bu
   const incomeSheetRef = useDialogSheet(incomeForm.isOpen, closeIncomeForm);
   const fixedSheetRef = useDialogSheet(fixedForm.isOpen, closeFixedForm);
   const categorySheetRef = useDialogSheet(categoryForm.isOpen, closeCategoryForm);
+  const viewportHeight = useVisualViewportHeight();
+  const sheetMaxHeight = viewportHeight > 0 ? `${Math.floor(viewportHeight * 0.94)}px` : '94vh';
 
   const openAddIncome = () => {
     setIncomeName(''); setIncomeAmount(''); setIncomeRecurring(true); setIncomeError('');
@@ -242,7 +245,7 @@ export function BudgetScreen({ initialTab = 'Genel Bakış' }: { initialTab?: Bu
     {tab === 'Kategoriler' && <section className="category-grid"><button className="add-inline" onClick={openAddCategory}><Icon name="plus" /> Yeni kategori</button>{monthCategoryBudgets.map(cat => { const spent = state.expenses.filter(e => e.monthKey === state.selectedMonthKey && e.category === cat.name).reduce((sum, e) => sum + e.amount, 0); const pct = spent / cat.limit * 100; const progressTone = pct > 100 ? 'danger' : pct >= 80 ? 'warn' : 'green'; return (<div key={cat.id} className="category-card-wrapper"><article className="category-card"><div><span className="category-dot" style={{ background: cat.color }}/><b>{cat.name}</b><strong>{Math.round(pct)}%</strong></div><h3>{formatCurrency(cat.limit - spent)}</h3><p>{formatCurrency(spent)} harcandı · {formatCurrency(cat.limit)} limit</p><Progress value={pct} tone={progressTone} /></article><div className="category-actions"><button className="delete-button" onClick={() => openEditCategory(cat)} aria-label="Kategoriyi düzenle"><Icon name="edit" /></button><button className="delete-button" onClick={() => deleteCategory(cat.id)} aria-label="Kategoriyi sil"><Icon name="trash" /></button></div></div>); })}</section>}
 
     {incomeForm.isOpen && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) closeIncomeForm(); }}>
-      <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="income-title" ref={incomeSheetRef}>
+      <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="income-title" ref={incomeSheetRef} style={{ maxHeight: sheetMaxHeight }}>
         <div className="sheet__handle" />
         <header className="sheet__header"><div><span className="eyebrow">GELİR</span><h2 id="income-title">{incomeForm.mode === 'add' ? 'Yeni gelir' : 'Geliri düzenle'}</h2></div><button className="icon-button" onClick={closeIncomeForm} aria-label="Kapat"><Icon name="close" /></button></header>
         <label className="field">Ad <input value={incomeName} onChange={e => { setIncomeName(e.target.value); setIncomeError(''); }} placeholder="Örn: Maaş" /></label>
@@ -254,7 +257,7 @@ export function BudgetScreen({ initialTab = 'Genel Bakış' }: { initialTab?: Bu
     </div>}
 
     {fixedForm.isOpen && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) closeFixedForm(); }}>
-      <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="fixed-title" ref={fixedSheetRef}>
+      <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="fixed-title" ref={fixedSheetRef} style={{ maxHeight: sheetMaxHeight }}>
         <div className="sheet__handle" />
         <header className="sheet__header"><div><span className="eyebrow">OTOMATİK GİDER</span><h2 id="fixed-title">{fixedForm.mode === 'add' ? 'Yeni otomatik gider' : 'Gideri düzenle'}</h2></div><button className="icon-button" onClick={closeFixedForm} aria-label="Kapat"><Icon name="close" /></button></header>
         <label className="field">Ad <input value={fixedName} onChange={e => { setFixedName(e.target.value); setFixedError(''); }} placeholder="Örn: Netflix" /></label>
@@ -267,7 +270,7 @@ export function BudgetScreen({ initialTab = 'Genel Bakış' }: { initialTab?: Bu
 </div>}
 
     {categoryForm.isOpen && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) closeCategoryForm(); }}>
-      <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="category-title" ref={categorySheetRef}>
+      <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="category-title" ref={categorySheetRef} style={{ maxHeight: sheetMaxHeight }}>
         <div className="sheet__handle" />
         <header className="sheet__header"><div><span className="eyebrow">KATEGORİ BÜTÇESİ</span><h2 id="category-title">{categoryForm.mode === 'add' ? 'Yeni kategori bütçesi' : 'Kategori bütçesini düzenle'}</h2></div><button className="icon-button" onClick={closeCategoryForm} aria-label="Kapat"><Icon name="close" /></button></header>
         <label className="field">Ad <input value={categoryName} onChange={e => { setCategoryName(e.target.value); setCategoryError(''); }} placeholder="Örn: Market" /></label>
@@ -316,10 +319,12 @@ export function AssetsScreen() {
 
   const closeAssetForm = () => { setAssetForm({ isOpen: false }); setFormError(''); };
   const assetSheetRef = useDialogSheet(assetForm.isOpen, closeAssetForm);
+  const viewportHeight = useVisualViewportHeight();
+  const sheetMaxHeight = viewportHeight > 0 ? `${Math.floor(viewportHeight * 0.94)}px` : '94vh';
 
   return <div className="screen"><PageHeader eyebrow="ÖZGÜRLÜK KASASI" title="Varlıklar & Hedefler" description="Finansal özgürlüğe olan mesafeni görünür kıl." /><section className="assets-hero"><span>TOPLAM FİNANSAL VARLIK</span><strong>{formatCurrency(total)}</strong><p>Genel hedef: {formatCurrency(target)}</p><Progress value={total / target * 100} tone="gold"/><small>%{Math.round(total / target * 100)} tamamlandı · {formatCurrency(target - total)} kaldı</small></section><section className="asset-grid">{state.assets.map(asset => { const progress = getAssetProgress(asset); return <article className="asset-card" key={asset.id}><header><span className="asset-monogram">{asset.group.slice(0, 2).toLocaleUpperCase('tr-TR')}</span><div><b>{asset.group}</b><small>Hedefin %{Math.round(progress)}'i</small></div></header><h3>{formatCurrency(asset.currentAmount)}</h3><p>{formatCurrency(asset.targetAmount)} hedef</p><Progress value={progress} tone="gold"/><div><span>Hedefe kalan</span><b>{formatCurrency(Math.max(0, asset.targetAmount - asset.currentAmount))}</b></div><button onClick={() => openAssetEdit(asset)}>Düzenle</button></article>; })}</section>
     {assetForm.isOpen && assetForm.currentAsset && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) closeAssetForm(); }}>
-      <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="asset-edit-title" ref={assetSheetRef}>
+      <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="asset-edit-title" ref={assetSheetRef} style={{ maxHeight: sheetMaxHeight }}>
         <div className="sheet__handle" />
         <header className="sheet__header"><div><span className="eyebrow">VARLIK DÜZENLE</span><h2 id="asset-edit-title">{assetForm.currentAsset.group}</h2></div><button className="icon-button" onClick={closeAssetForm} aria-label="Kapat"><Icon name="close" /></button></header>
         <label className="amount-input"><span>Mevcut tutar</span><div><input autoFocus inputMode="decimal" value={currentAmount} onChange={e => { setCurrentAmount(e.target.value.replace(/[^0-9.]/g, '')); setFormError(''); }} placeholder="0" aria-label="Mevcut tutar"/><b>TL</b></div></label>
