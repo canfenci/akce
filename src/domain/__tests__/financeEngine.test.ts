@@ -144,9 +144,132 @@ describe('Finance Engine', () => {
       
       // 3 harcama var, toplam 4500
       // Ortalama: 4500 / 3 = 1500
-      expect(summary.sevenDayAverage).toBe(1500);
-    });
-  });
+expect(summary.sevenDayAverage).toBe(1500);
+     });
+   });
+
+   describe('monthEndEstimate', () => {
+     it('should use 7-day average when available', () => {
+       const incomes: Income[] = [
+         { id: '1', name: 'Maaş', amount: 50000, date: '2024-01-01', recurring: true, active: true, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
+       ];
+       
+       const fixedExpenses: FixedExpense[] = [];
+       
+       const investments: Investment[] = [];
+       
+       const expenses: Expense[] = [
+         { id: '1', amount: 1000, category: 'market', type: 'zorunlu', paymentMethod: 'kart', date: '2024-01-08', monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' },
+         { id: '2', amount: 1500, category: 'market', type: 'zorunlu', paymentMethod: 'kart', date: '2024-01-09', monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' },
+         { id: '3', amount: 2000, category: 'market', type: 'zorunlu', paymentMethod: 'kart', date: '2024-01-10', monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
+       ];
+       
+       const assets: Asset[] = [];
+       const currentDate = new Date('2024-01-15'); // daysLeft = 16
+       
+       const summary = calculateMonthSummary(incomes, fixedExpenses, investments, expenses, assets, currentDate);
+       
+       // totalVariableExpenses = 4500
+       // sevenDayAverage = (1000+1500+2000)/3 = 1500
+       // daysLeft = 16
+       // expected monthEndEstimate = 4500 + 1500 * 16 = 4500 + 24000 = 28500
+       expect(summary.monthEndEstimate).toBeCloseTo(28500, 1);
+     });
+     
+
+     
+     it('should use 0 when no expense data', () => {
+       const incomes: Income[] = [
+         { id: '1', name: 'Maaş', amount: 50000, date: '2024-01-01', recurring: true, active: true, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
+       ];
+       
+       const fixedExpenses: FixedExpense[] = [];
+       
+       const investments: Investment[] = [];
+       
+       const expenses: Expense[] = [];
+       
+       const assets: Asset[] = [];
+       const currentDate = new Date('2024-01-15');
+       
+       const summary = calculateMonthSummary(incomes, fixedExpenses, investments, expenses, assets, currentDate);
+       
+       // No variable expenses, averages should be 0
+       expect(summary.monthEndEstimate).toBe(0);
+     });
+     
+     it('should use totalVariableExpenses when daysLeft is 0', () => {
+       const incomes: Income[] = [
+         { id: '1', name: 'Maaş', amount: 50000, date: '2024-01-31', recurring: true, active: true, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
+       ];
+       
+       const fixedExpenses: FixedExpense[] = [];
+       
+       const investments: Investment[] = [];
+       
+       const expenses: Expense[] = [
+         { id: '1', amount: 500, category: 'market', type: 'zorunlu', paymentMethod: 'kart', date: '2024-01-31', monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
+       ];
+       
+       const assets: Asset[] = [];
+       const currentDate = new Date('2024-01-31'); // daysLeft = 0
+       
+       const summary = calculateMonthSummary(incomes, fixedExpenses, investments, expenses, assets, currentDate);
+       
+       // daysLeft = 0, so monthEndEstimate should equal totalVariableExpenses
+       expect(summary.monthEndEstimate).toBe(summary.totalVariableExpenses);
+     });
+     
+     it('should be deterministic regardless of remainingBudget sign', () => {
+       // Case 1: positive remainingBudget
+       const incomes1: Income[] = [
+         { id: '1', name: 'Maaş', amount: 50000, date: '2024-01-01', recurring: true, active: true, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
+       ];
+       
+       const fixedExpenses1: FixedExpense[] = [
+         { id: '1', name: 'Kira', amount: 10000, dueDay: 1, category: 'konut', frequency: 'monthly', active: true, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
+       ];
+       
+       const investments1: Investment[] = [];
+       
+       const expenses1: Expense[] = [
+         { id: '1', amount: 1000, category: 'market', type: 'zorunlu', paymentMethod: 'kart', date: '2024-01-05', monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' },
+         { id: '2', amount: 1500, category: 'market', type: 'zorunlu', paymentMethod: 'kart', date: '2024-01-06', monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
+       ];
+       
+       const assets1: Asset[] = [];
+       const currentDate = new Date('2024-01-15');
+       
+       const summary1 = calculateMonthSummary(incomes1, fixedExpenses1, investments1, expenses1, assets1, currentDate);
+       
+       // Case 2: negative remainingBudget (higher expenses)
+       const incomes2: Income[] = [
+         { id: '1', name: 'Maaş', amount: 20000, date: '2024-01-01', recurring: true, active: true, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
+       ];
+       
+       const fixedExpenses2: FixedExpense[] = [
+         { id: '1', name: 'Kira', amount: 10000, dueDay: 1, category: 'konut', frequency: 'monthly', active: true, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
+       ];
+       
+       const investments2: Investment[] = [];
+       
+       const expenses2: Expense[] = [
+         { id: '1', amount: 5000, category: 'market', type: 'zorunlu', paymentMethod: 'kart', date: '2024-01-05', monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' },
+         { id: '2', amount: 6000, category: 'market', type: 'zorunlu', paymentMethod: 'kart', date: '2024-01-06', monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
+       ];
+       
+       const assets2: Asset[] = [];
+       const currentDate2 = new Date('2024-01-15');
+       
+       const summary2 = calculateMonthSummary(incomes2, fixedExpenses2, investments2, expenses2, assets2, currentDate2);
+       
+       // The monthEndEstimate should be proportional to the expenses and averages, not affected by remainingBudget sign.
+       // We'll just check that the values are computed (not NaN) and that they differ as expected.
+       expect(!isNaN(summary1.monthEndEstimate)).toBe(true);
+       expect(!isNaN(summary2.monthEndEstimate)).toBe(true);
+       expect(summary2.monthEndEstimate).toBeGreaterThan(summary1.monthEndEstimate);
+     });
+   });
 
   describe('formatCurrency', () => {
     it('should format currency in Turkish locale', () => {

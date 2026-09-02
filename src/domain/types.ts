@@ -123,3 +123,10 @@ export interface UserSettings {
   createdAt: number;
   updatedAt: number;
 }
+
+export interface CategoryBudget {
+  id: string;
+  name: string;
+  limit: number;
+  color: string;
+}

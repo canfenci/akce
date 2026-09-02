@@ -99,8 +99,12 @@ export function calculateMonthSummary(
     ? (unplannedExpenses.reduce((sum, e) => sum + e.amount, 0) / totalVariableExpenses) * 100
     : 0;
   
-  // Ay sonu harcama tahmini
-  const monthEndEstimate = totalVariableExpenses + (dailySafeLimit * daysLeft);
+// Ay sonu harcama tahmini: son 7 günlük ortalama harcama * kalan gün + gerçekleşen değişken giderler
+    let avgDailySpend = sevenDayAverage;
+    if (avgDailySpend === 0 && threeDayAverage > 0) {
+      avgDailySpend = threeDayAverage;
+    }
+    const monthEndEstimate = totalVariableExpenses + (avgDailySpend * daysLeft);
   
   // Yatırım planı gerçekleşme oranı
   const actualInvestments = investments
