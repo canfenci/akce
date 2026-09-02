@@ -274,7 +274,47 @@ export function InvestmentsScreen() {
 
 export function AssetsScreen() {
   const { state, dispatch } = useAkceStore(); const total = getTotalAssets(state.assets); const target = getTotalAssetTargets(state.assets);
-  return <div className="screen"><PageHeader eyebrow="ÖZGÜRLÜK KASASI" title="Varlıklar & Hedefler" description="Finansal özgürlüğe olan mesafeni görünür kıl." /><section className="assets-hero"><span>TOPLAM FİNANSAL VARLIK</span><strong>{formatCurrency(total)}</strong><p>Genel hedef: {formatCurrency(target)}</p><Progress value={total / target * 100} tone="gold"/><small>%{Math.round(total / target * 100)} tamamlandı · {formatCurrency(target - total)} kaldı</small></section><section className="asset-grid">{state.assets.map(asset => { const progress = getAssetProgress(asset); return <article className="asset-card" key={asset.id}><header><span className="asset-monogram">{asset.group.slice(0, 2).toLocaleUpperCase('tr-TR')}</span><div><b>{asset.group}</b><small>Hedefin %{Math.round(progress)}’i</small></div></header><h3>{formatCurrency(asset.currentAmount)}</h3><p>{formatCurrency(asset.targetAmount)} hedef</p><Progress value={progress} tone="gold"/><div><span>Hedefe kalan</span><b>{formatCurrency(Math.max(0, asset.targetAmount - asset.currentAmount))}</b></div><button onClick={() => { const value = window.prompt(`${asset.group} güncel tutarı`, String(asset.currentAmount)); if (value !== null && Number.isFinite(Number(value))) dispatch({ type: 'UPDATE_ASSET', id: asset.id, amount: Number(value) }); }}>Tutarı güncelle</button></article>; })}</section></div>;
+  const [assetForm, setAssetForm] = useState<{ isOpen: boolean; currentAsset?: typeof state.assets[number] }>({ isOpen: false });
+  const [currentAmount, setCurrentAmount] = useState('');
+  const [targetAmount, setTargetAmount] = useState('');
+  const [formError, setFormError] = useState('');
+
+  const openAssetEdit = (asset: typeof state.assets[number]) => {
+    setCurrentAmount(String(asset.currentAmount));
+    setTargetAmount(String(asset.targetAmount));
+    setFormError('');
+    setAssetForm({ isOpen: true, currentAsset: asset });
+  };
+
+  const saveAsset = () => {
+    const cur = Number(currentAmount);
+    const tgt = Number(targetAmount);
+    if (!Number.isFinite(cur) || cur < 0) { setFormError('Mevcut tutar 0 veya daha büyük olmalı.'); return; }
+    if (!Number.isFinite(tgt) || tgt <= 0) { setFormError('Hedef tutar 0\'dan büyük olmalı.'); return; }
+    if (!assetForm.currentAsset) return;
+    dispatch({ type: 'UPDATE_ASSET', id: assetForm.currentAsset.id, amount: cur, targetAmount: tgt });
+    setAssetForm({ isOpen: false });
+  };
+
+  useEffect(() => {
+    if (!assetForm.isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') setAssetForm({ isOpen: false }); };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [assetForm.isOpen]);
+
+  return <div className="screen"><PageHeader eyebrow="ÖZGÜRLÜK KASASI" title="Varlıklar & Hedefler" description="Finansal özgürlüğe olan mesafeni görünür kıl." /><section className="assets-hero"><span>TOPLAM FİNANSAL VARLIK</span><strong>{formatCurrency(total)}</strong><p>Genel hedef: {formatCurrency(target)}</p><Progress value={total / target * 100} tone="gold"/><small>%{Math.round(total / target * 100)} tamamlandı · {formatCurrency(target - total)} kaldı</small></section><section className="asset-grid">{state.assets.map(asset => { const progress = getAssetProgress(asset); return <article className="asset-card" key={asset.id}><header><span className="asset-monogram">{asset.group.slice(0, 2).toLocaleUpperCase('tr-TR')}</span><div><b>{asset.group}</b><small>Hedefin %{Math.round(progress)}'i</small></div></header><h3>{formatCurrency(asset.currentAmount)}</h3><p>{formatCurrency(asset.targetAmount)} hedef</p><Progress value={progress} tone="gold"/><div><span>Hedefe kalan</span><b>{formatCurrency(Math.max(0, asset.targetAmount - asset.currentAmount))}</b></div><button onClick={() => openAssetEdit(asset)}>Düzenle</button></article>; })}</section>
+    {assetForm.isOpen && assetForm.currentAsset && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setAssetForm({ isOpen: false }); }}>
+      <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="asset-edit-title">
+        <div className="sheet__handle" />
+        <header className="sheet__header"><div><span className="eyebrow">VARLIK DÜZENLE</span><h2 id="asset-edit-title">{assetForm.currentAsset.group}</h2></div><button className="icon-button" onClick={() => setAssetForm({ isOpen: false })} aria-label="Kapat"><Icon name="close" /></button></header>
+        <label className="amount-input"><span>Mevcut tutar</span><div><input autoFocus inputMode="decimal" value={currentAmount} onChange={e => { setCurrentAmount(e.target.value.replace(/[^0-9.]/g, '')); setFormError(''); }} placeholder="0" aria-label="Mevcut tutar"/><b>TL</b></div></label>
+        <label className="amount-input"><span>Hedef tutar</span><div><input inputMode="decimal" value={targetAmount} onChange={e => { setTargetAmount(e.target.value.replace(/[^0-9.]/g, '')); setFormError(''); }} placeholder="0" aria-label="Hedef tutar"/><b>TL</b></div></label>
+        {formError && <p className="form-error">{formError}</p>}
+        <button className="primary-button" disabled={!Number.isFinite(Number(currentAmount)) || Number(currentAmount) < 0 || !Number.isFinite(Number(targetAmount)) || Number(targetAmount) <= 0} onClick={saveAsset}>Kaydet</button>
+      </section>
+    </div>}
+  </div>;
 }
 
 export function CoachScreen() {

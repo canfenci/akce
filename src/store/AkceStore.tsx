@@ -17,7 +17,7 @@ export type Action =
   | { type: 'DELETE_INCOME'; id: string }
   | { type: 'TOGGLE_FIXED'; id: string }
   | { type: 'TOGGLE_INVESTMENT'; id: string }
-  | { type: 'UPDATE_ASSET'; id: string; amount: number }
+  | { type: 'UPDATE_ASSET'; id: string; amount: number; targetAmount?: number }
   | { type: 'ADD_FIXED_EXPENSE'; payload: FixedExpense }
   | { type: 'UPDATE_FIXED_EXPENSE'; payload: FixedExpense }
   | { type: 'DELETE_FIXED_EXPENSE'; id: string }
@@ -87,7 +87,7 @@ export function reducer(state: AkceData, action: Action): AkceData {
     case 'SET_SELECTED_MONTH': return { ...state, selectedMonthKey: action.monthKey };
     case 'INITIALIZE_MONTH': return initializeMonth(state, action.sourceMonthKey, action.targetMonthKey);
     case 'TOGGLE_INVESTMENT': return { ...state, investments: state.investments.map(item => item.id === action.id ? { ...item, completed: !item.completed, actualAmount: item.completed ? 0 : item.plannedAmount, completedDate: item.completed ? undefined : new Date().toISOString().slice(0, 10), updatedAt: Date.now() } : item) };
-    case 'UPDATE_ASSET': return { ...state, assets: state.assets.map(item => item.id === action.id ? { ...item, currentAmount: Math.max(0, action.amount), updatedAt: Date.now() } : item) };
+    case 'UPDATE_ASSET': return { ...state, assets: state.assets.map(item => item.id === action.id ? { ...item, currentAmount: Math.max(0, action.amount), targetAmount: action.targetAmount !== undefined ? Math.max(0, action.targetAmount) : item.targetAmount, updatedAt: Date.now() } : item) };
     case 'SET_ONBOARDING': return { ...state, settings: { ...state.settings, showOnboarding: action.value, updatedAt: Date.now() } };
     case 'RESET': return { ...seedData, settings: { ...seedData.settings, showOnboarding: false } };
     case 'SYNC_HYDRATE_STATE': return action.state;
@@ -164,7 +164,7 @@ function mapActionToMutation(action: Action, currentState: AkceData): FinanceMut
     }
     case 'UPDATE_ASSET': {
       const item = currentState.assets.find(a => a.id === action.id);
-      return item ? { type: 'asset.update', value: { ...item, currentAmount: Math.max(0, action.amount), updatedAt: Date.now() } } : null;
+      return item ? { type: 'asset.update', value: { ...item, currentAmount: Math.max(0, action.amount), targetAmount: action.targetAmount !== undefined ? Math.max(0, action.targetAmount) : item.targetAmount, updatedAt: Date.now() } } : null;
     }
     case 'INITIALIZE_MONTH': {
       const nextState = initializeMonth(currentState, action.sourceMonthKey, action.targetMonthKey);
