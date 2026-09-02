@@ -4,6 +4,7 @@ import { calculateMonthSummary, formatCurrency, formatPercentage, getAssetProgre
 import { formatMonthKey, getMonthCalculationDate, shiftMonthKey } from '../domain/month';
 import type { Income, FixedExpense, CategoryBudget } from '../domain/types';
 import { useAkceStore } from '../store/AkceStore';
+import { getIsDeviceTrusted, setIsDeviceTrusted } from '../store/devicePreference';
 import { Icon } from '../components/Icon';
 import { Progress } from '../components/Progress';
 
@@ -270,5 +271,11 @@ export function CoachScreen() {
 
 export function SettingsScreen({ account }: { account?: { label: string; detail: string; actionLabel: string; onAction: () => void } }) {
   const { state, dispatch } = useAkceStore();
-  return <div className="screen"><PageHeader eyebrow="TERCİHLER" title="Ayarlar" description="Akçe deneyimini kendine göre düzenle." />{account && <section className="settings-card"><div><span>Oturum</span><span className="settings-account"><b>{account.label}</b><small>{account.detail}</small></span></div><div><span>Hesap seçimi</span><button className="secondary-button" onClick={account.onAction}>{account.actionLabel}</button></div></section>}<section className="settings-card"><div><span>Para birimi</span><b>{state.settings.currency}</b></div><div><span>Bütçe başlangıç günü</span><b>Her ayın {state.settings.monthStartDay}. günü</b></div><div><span>Veri saklama</span><b>Bu cihazda</b></div></section><section className="settings-card"><div><span>Tanıtımı yeniden göster</span><button className="secondary-button" onClick={() => dispatch({ type: 'SET_ONBOARDING', value: true })}>Göster</button></div><div><span>Örnek verileri sıfırla</span><button className="secondary-button secondary-button--danger" onClick={() => dispatch({ type: 'RESET' })}>Sıfırla</button></div></section><p className="settings-note">Akçe V1 verileri yalnızca tarayıcında saklar. Banka ve bulut bağlantısı yoktur.</p></div>;
+  const [isTrusted, setIsTrustedState] = useState(() => getIsDeviceTrusted());
+  const toggleTrusted = () => {
+    const next = !isTrusted;
+    setIsDeviceTrusted(next);
+    setIsTrustedState(next);
+  };
+  return <div className="screen"><PageHeader eyebrow="TERCİHLER" title="Ayarlar" description="Akçe deneyimini kendine göre düzenle." />{account && <section className="settings-card"><div><span>Oturum</span><span className="settings-account"><b>{account.label}</b><small>{account.detail}</small></span></div><div><span>Hesap seçimi</span><button className="secondary-button" onClick={account.onAction}>{account.actionLabel}</button></div></section>}<section className="settings-card"><div><span>Para birimi</span><b>{state.settings.currency}</b></div><div><span>Bütçe başlangıç günü</span><b>Her ayın {state.settings.monthStartDay}. günü</b></div><div><span>Veri saklama</span><b>Bu cihazda</b></div><div><span>Cihaz türü</span><button className="secondary-button" onClick={toggleTrusted}>{isTrusted ? 'Kişisel cihaz (Kalıcı önbellek)' : 'Ortak cihaz (Geçici bellek)'}</button></div></section><section className="settings-card"><div><span>Tanıtımı yeniden göster</span><button className="secondary-button" onClick={() => dispatch({ type: 'SET_ONBOARDING', value: true })}>Göster</button></div><div><span>Örnek verileri sıfırla</span><button className="secondary-button secondary-button--danger" onClick={() => dispatch({ type: 'RESET' })}>Sıfırla</button></div></section><p className="settings-note">Akçe V1 verileri yalnızca tarayıcında saklar. Banka ve bulut bağlantısı yoktur.</p></div>;
 }

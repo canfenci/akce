@@ -6,6 +6,7 @@ import { createFirebaseFinanceRepository } from './firebaseFinanceRepository';
 import { createFirestoreGateway } from './firestoreGateway';
 import { FinanceSyncCoordinator, type SyncStatus } from './financeSyncCoordinator';
 import type { FinanceMutation, FinanceSubscriptionUpdate } from './financeRepository';
+import { getPreferredCacheMode } from './devicePreference';
 import { useAuth } from '../auth/AuthProvider';
 
 export type Action =
@@ -203,8 +204,9 @@ export function AkceStoreProvider({
 
   const coordinator = useMemo(() => {
     if (injectedCoordinator) return injectedCoordinator;
-    const gateway = createFirestoreGateway();
-    const firebaseRepo = createFirebaseFinanceRepository({ gateway });
+    const cacheMode = getPreferredCacheMode();
+    const gateway = createFirestoreGateway(cacheMode);
+    const firebaseRepo = createFirebaseFinanceRepository({ gateway, cacheMode });
     return new FinanceSyncCoordinator({
       localRepository: localStorageFinanceRepository,
       firebaseRepository: firebaseRepo,

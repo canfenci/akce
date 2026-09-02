@@ -6,7 +6,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "vitest",
+    "test": "vitest run",
+    "test:rules": "vitest run src/store/__tests__/firestoreRules.test.ts",
     "lint": "echo 'No linter configured yet'"
   },
   "keywords": ["finance", "budget", "pwa"],

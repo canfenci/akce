@@ -1,10 +1,13 @@
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { AuthProvider } from './auth/AuthProvider';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import './styles/global.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <AuthProvider><App /></AuthProvider>
+  <ErrorBoundary>
+    <AuthProvider><App /></AuthProvider>
+  </ErrorBoundary>
 );
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {

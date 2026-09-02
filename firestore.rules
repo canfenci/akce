@@ -1,0 +1,125 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny for all undefined paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    function validMonthKey(monthKey) {
+      return monthKey is string && monthKey.matches('^[0-9]{4}-(0[1-9]|1[0-2])$');
+    }
+
+    function validSchemaVersion() {
+      return request.resource.data.schemaVersion == 2;
+    }
+
+    function validNumber(val, minVal) {
+      return val is number && val >= minVal;
+    }
+
+    function validString(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    // User document tree
+    match /users/{uid} {
+      allow read, write: if isOwner(uid);
+
+      // Metadata (e.g. migration marker)
+      match /meta/{metaId} {
+        allow read: if isOwner(uid);
+        allow write: if isOwner(uid) && validSchemaVersion();
+      }
+
+      // Global collections: assets, goals, assetSnapshots
+      match /assets/{assetId} {
+        allow read: if isOwner(uid);
+        allow write: if isOwner(uid)
+          && validSchemaVersion()
+          && validNumber(request.resource.data.currentAmount, 0)
+          && validNumber(request.resource.data.targetAmount, 0);
+        allow delete: if isOwner(uid);
+      }
+
+      match /goals/{goalId} {
+        allow read: if isOwner(uid);
+        allow write: if isOwner(uid)
+          && validSchemaVersion()
+          && validNumber(request.resource.data.targetAmount, 0);
+        allow delete: if isOwner(uid);
+      }
+
+      match /assetSnapshots/{snapshotId} {
+        allow read: if isOwner(uid);
+        allow write: if isOwner(uid)
+          && validMonthKey(request.resource.data.monthKey)
+          && validNumber(request.resource.data.amount, 0);
+        allow delete: if isOwner(uid);
+      }
+
+      // Monthly collections
+      match /months/{monthKey} {
+        allow read, write: if isOwner(uid) && validMonthKey(monthKey);
+
+        match /expenses/{expenseId} {
+          allow read: if isOwner(uid);
+          allow write: if isOwner(uid)
+            && validMonthKey(monthKey)
+            && validSchemaVersion()
+            && validNumber(request.resource.data.amount, 0)
+            && (request.resource.data.type in ['zorunlu', 'isteğe bağlı', 'plansız'])
+            && (request.resource.data.paymentMethod in ['kart', 'nakit']);
+          allow delete: if isOwner(uid);
+        }
+
+        match /incomes/{incomeId} {
+          allow read: if isOwner(uid);
+          allow write: if isOwner(uid)
+            && validMonthKey(monthKey)
+            && validSchemaVersion()
+            && validNumber(request.resource.data.amount, 0)
+            && validString(request.resource.data.name, 1, 100);
+          allow delete: if isOwner(uid);
+        }
+
+        match /fixedExpenses/{fixedExpenseId} {
+          allow read: if isOwner(uid);
+          allow write: if isOwner(uid)
+            && validMonthKey(monthKey)
+            && validSchemaVersion()
+            && validNumber(request.resource.data.amount, 0)
+            && validString(request.resource.data.name, 1, 100);
+          allow delete: if isOwner(uid);
+        }
+
+        match /investments/{investmentId} {
+          allow read: if isOwner(uid);
+          allow write: if isOwner(uid)
+            && validMonthKey(monthKey)
+            && validSchemaVersion()
+            && validNumber(request.resource.data.plannedAmount, 0)
+            && validNumber(request.resource.data.actualAmount, 0);
+          allow delete: if isOwner(uid);
+        }
+
+        match /categoryBudgets/{budgetId} {
+          allow read: if isOwner(uid);
+          allow write: if isOwner(uid)
+            && validMonthKey(monthKey)
+            && validNumber(request.resource.data.limit, 0);
+          allow delete: if isOwner(uid);
+        }
+      }
+    }
+  }
+}
