@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+coverage/
+*.tsbuildinfo
+*.js.map
+*.mjs.map
+
+# Environment and local overrides
+.env
+.env.*
+!.env.example
+*.local
+
+# Tooling and editor files
+.vite/
+.vscode/
+.idea/
+*.swp
+*.swo
+*.log
+.DS_Store
+
+# Local recovery artifacts and backups
+.backups/
+src/features/*.broken-backup
+src/features/*.AKCE-004-broken-backup
