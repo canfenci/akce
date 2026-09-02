@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
 import { coachProvider } from '../domain/coachEngine';
 import { calculateMonthSummary, formatCurrency, formatPercentage, getAssetProgress, getMonthKey, getTotalAssets, getTotalAssetTargets } from '../domain/financeEngine';
+import { formatMonthKey, getMonthCalculationDate, shiftMonthKey } from '../domain/month';
 import type { Income, FixedExpense, CategoryBudget } from '../domain/types';
 import { useAkceStore } from '../store/AkceStore';
 import { Icon } from '../components/Icon';
 import { Progress } from '../components/Progress';
 
-const monthLabel = new Intl.DateTimeFormat('tr-TR', { month: 'long', year: 'numeric' }).format(new Date());
 const titleCase = (value: string) => value.charAt(0).toLocaleUpperCase('tr-TR') + value.slice(1);
 
 type IncomeFormMode = 'add' | 'edit';
@@ -26,11 +26,27 @@ interface FixedExpenseFormState {
 
 export function useSummary() {
   const { state } = useAkceStore();
-  return useMemo(() => calculateMonthSummary(state.incomes, state.fixedExpenses, state.investments, state.expenses, state.assets), [state]);
+  return useMemo(() => calculateMonthSummary(state.incomes, state.fixedExpenses, state.investments, state.expenses, state.assets, getMonthCalculationDate(state.selectedMonthKey)), [state]);
 }
 
 function PageHeader({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
-  return <header className="page-header"><div><span className="eyebrow">{eyebrow}</span><h1>{title}</h1><p>{description}</p></div><span className="month-pill"><Icon name="calendar" />{monthLabel}</span></header>;
+  return <header className="page-header"><div><span className="eyebrow">{eyebrow}</span><h1>{title}</h1><p>{description}</p></div></header>;
+}
+
+function MonthNavigation() {
+  const { state, dispatch } = useAkceStore();
+  const currentMonthKey = getMonthKey();
+  const sourceMonthKey = shiftMonthKey(state.selectedMonthKey, -1);
+  const hasMonthData = state.incomes.some(item => item.monthKey === state.selectedMonthKey)
+    || state.fixedExpenses.some(item => item.monthKey === state.selectedMonthKey)
+    || state.investments.some(item => item.monthKey === state.selectedMonthKey)
+    || state.categoryBudgets.some(item => item.monthKey === state.selectedMonthKey);
+  return <div className="month-navigation">
+    <button onClick={() => dispatch({ type: 'SET_SELECTED_MONTH', monthKey: sourceMonthKey })} aria-label="Önceki ay">‹</button>
+    <div><b>{formatMonthKey(state.selectedMonthKey)}</b><small>{state.selectedMonthKey === currentMonthKey ? 'Bu ay' : 'Geçmiş ay'}</small></div>
+    <button disabled={state.selectedMonthKey >= currentMonthKey} onClick={() => dispatch({ type: 'SET_SELECTED_MONTH', monthKey: shiftMonthKey(state.selectedMonthKey, 1) })} aria-label="Sonraki ay">›</button>
+    {!hasMonthData && <button className="month-navigation__initialize" onClick={() => dispatch({ type: 'INITIALIZE_MONTH', sourceMonthKey, targetMonthKey: state.selectedMonthKey })}>Önceki ayın planıyla hazırla</button>}
+  </div>;
 }
 
 function Metric({ label, value, detail }: { label: string; value: string; detail?: string }) {
@@ -43,9 +59,10 @@ export function HomeScreen({ goTo }: { goTo: (page: string) => void }) {
   const advice = coachProvider.getAdvice(summary)[0];
   const totalAssets = getTotalAssets(state.assets);
   const assetTargets = getTotalAssetTargets(state.assets);
-  const actualInvestments = state.investments.reduce((sum, item) => sum + item.actualAmount, 0);
+  const actualInvestments = state.investments.filter(item => item.monthKey === state.selectedMonthKey).reduce((sum, item) => sum + item.actualAmount, 0);
   return <div className="screen home-screen">
-    <header className="home-welcome"><div><span className="eyebrow">{monthLabel.toLocaleUpperCase('tr-TR')}</span><h1>Merhaba, Murat.</h1></div><button className="avatar" aria-label="Profil">MB</button></header>
+    <header className="home-welcome"><div><span className="eyebrow">{formatMonthKey(state.selectedMonthKey).toLocaleUpperCase('tr-TR')}</span><h1>Merhaba, Murat.</h1></div><button className="avatar" aria-label="Profil">MB</button></header>
+    <MonthNavigation />
     <section className="hero-balance">
       <span className="hero-balance__label">BUGÜN GÜVENLE HARCAYABİLECEĞİN</span>
       <strong>{formatCurrency(summary.dailySafeLimit)}</strong>
@@ -58,7 +75,7 @@ export function HomeScreen({ goTo }: { goTo: (page: string) => void }) {
     </section>
     <button className={`coach-card coach-card--${advice.tone}`} onClick={() => goTo('coach')}><span className="coach-card__icon"><Icon name="spark" /></span><span><small>FİNANS KOÇU</small><b>{advice.title}</b><p>{advice.message}</p></span><Icon name="arrow" className="coach-card__arrow" /></button>
     <div className="home-lower">
-      <section className="plain-section"><div className="section-heading"><div><span className="eyebrow">YAŞAM KASASI</span><h2>Son harcamalar</h2></div><button className="text-button" onClick={() => goTo('expenses')}>Tümünü gör <Icon name="arrow" /></button></div><div className="transaction-list">{state.expenses.slice(0, 3).map(item => <div className="transaction" key={item.id}><span className="transaction__icon"><Icon name={item.paymentMethod === 'kart' ? 'card' : 'receipt'} /></span><span><b>{item.note || item.category}</b><small>{item.category} · {titleCase(item.type)}</small></span><strong>-{formatCurrency(item.amount)}</strong></div>)}</div></section>
+      <section className="plain-section"><div className="section-heading"><div><span className="eyebrow">YAŞAM KASASI</span><h2>Son harcamalar</h2></div><button className="text-button" onClick={() => goTo('expenses')}>Tümünü gör <Icon name="arrow" /></button></div><div className="transaction-list">{state.expenses.filter(item => item.monthKey === state.selectedMonthKey).slice(0, 3).map(item => <div className="transaction" key={item.id}><span className="transaction__icon"><Icon name={item.paymentMethod === 'kart' ? 'card' : 'receipt'} /></span><span><b>{item.note || item.category}</b><small>{item.category} · {titleCase(item.type)}</small></span><strong>-{formatCurrency(item.amount)}</strong></div>)}</div></section>
       <aside className="freedom-summary"><span className="eyebrow">ÖZGÜRLÜK KASASI</span><h2>{formatCurrency(totalAssets)}</h2><p>Toplam finansal varlık</p><Progress value={totalAssets / assetTargets * 100} tone="gold" /><div><span>Genel hedef</span><b>{formatCurrency(assetTargets)}</b></div><button onClick={() => goTo('assets')}>Varlıkları incele <Icon name="arrow" /></button></aside>
     </div>
     <section className="investment-strip"><div><span className="eyebrow">BU AY YATIRIM</span><strong>{formatCurrency(actualInvestments)}</strong><small>{formatCurrency(summary.totalFixedInvestment)} planlandı</small></div><Progress value={summary.investmentPlanRealizationRate} tone="gold"/><b>%{Math.round(summary.investmentPlanRealizationRate)}</b></section>
@@ -69,8 +86,10 @@ export function ExpensesScreen({ openQuick }: { openQuick: () => void }) {
   const { state, dispatch } = useAkceStore();
   const summary = useSummary();
   const [filter, setFilter] = useState('Tümü');
-  const visible = filter === 'Tümü' ? state.expenses : state.expenses.filter(item => titleCase(item.type) === filter);
+  const monthExpenses = state.expenses.filter(item => item.monthKey === state.selectedMonthKey);
+  const visible = filter === 'Tümü' ? monthExpenses : monthExpenses.filter(item => titleCase(item.type) === filter);
   return <div className="screen"><PageHeader eyebrow="YAŞAM KASASI" title="Harcamalar" description="Her çıkışı gör, davranışını fark et." />
+    <MonthNavigation />
     <div className="metric-row"><Metric label="Bu ay harcanan" value={formatCurrency(summary.totalVariableExpenses)} /><Metric label="Plansız oran" value={formatPercentage(summary.unplannedRatio)} detail="Hedef: %20 altı" /><button className="add-inline" onClick={openQuick}><Icon name="plus" /> Yeni harcama</button></div>
     <div className="filter-row">{['Tümü', 'Zorunlu', 'İsteğe bağlı', 'Plansız'].map(item => <button key={item} className={filter === item ? 'active' : ''} onClick={() => setFilter(item)}>{item}</button>)}</div>
     <section className="data-card"><div className="data-card__header"><b>İşlemler</b><span>{visible.length} kayıt</span></div>{visible.map(item => <div className="data-row" key={item.id}><span className="transaction__icon"><Icon name={item.paymentMethod === 'kart' ? 'card' : 'receipt'} /></span><span className="data-row__main"><b>{item.note || item.category}</b><small>{new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long' }).format(new Date(item.date))} · {item.paymentMethod}</small></span><span className={`tag tag--${item.type === 'plansız' ? 'warn' : 'neutral'}`}>{titleCase(item.type)}</span><strong>-{formatCurrency(item.amount)}</strong><button className="delete-button" onClick={() => dispatch({ type: 'REMOVE_EXPENSE', id: item.id })} aria-label="Harcamayı sil"><Icon name="trash" /></button></div>)}</section>
@@ -81,6 +100,9 @@ type BudgetTab = 'Genel Bakış' | 'Gelirler' | 'Otomatik Giderler' | 'Kategoril
 export function BudgetScreen({ initialTab = 'Genel Bakış' }: { initialTab?: BudgetTab }) {
   const { state, dispatch } = useAkceStore(); const summary = useSummary(); const [tab, setTab] = useState<BudgetTab>(initialTab);
   const tabs: BudgetTab[] = ['Genel Bakış', 'Gelirler', 'Otomatik Giderler', 'Kategoriler'];
+  const monthIncomes = state.incomes.filter(item => item.monthKey === state.selectedMonthKey);
+  const monthFixedExpenses = state.fixedExpenses.filter(item => item.monthKey === state.selectedMonthKey);
+  const monthCategoryBudgets = state.categoryBudgets.filter(item => item.monthKey === state.selectedMonthKey);
 
   const [incomeForm, setIncomeForm] = useState<IncomeFormState>({ isOpen: false, mode: 'add' });
   const [incomeName, setIncomeName] = useState('');
@@ -117,14 +139,14 @@ export function BudgetScreen({ initialTab = 'Genel Bakış' }: { initialTab?: Bu
     if (incomeForm.mode === 'edit' && incomeForm.currentIncome) {
       dispatch({ type: 'UPDATE_INCOME', payload: { ...incomeForm.currentIncome, name: incomeName.trim(), amount, recurring: incomeRecurring, updatedAt: now } });
     } else {
-      dispatch({ type: 'ADD_INCOME', payload: { id: crypto.randomUUID(), name: incomeName.trim(), amount, date: new Date(now).toISOString().slice(0, 10), recurring: incomeRecurring, active: true, monthKey: getMonthKey(), createdAt: now, updatedAt: now, userId: 'local-user' } });
+      dispatch({ type: 'ADD_INCOME', payload: { id: crypto.randomUUID(), name: incomeName.trim(), amount, date: `${state.selectedMonthKey}-01`, recurring: incomeRecurring, active: true, monthKey: state.selectedMonthKey, createdAt: now, updatedAt: now, userId: 'local-user' } });
     }
     setIncomeForm({ isOpen: false, mode: 'add' });
   };
 
   const deleteIncome = (id: string) => dispatch({ type: 'DELETE_INCOME', id });
 
-  const uniqueCategories = Array.from(new Set([...state.categoryBudgets.map(category => category.name), ...state.fixedExpenses.map(expense => expense.category)]));
+  const uniqueCategories = Array.from(new Set([...monthCategoryBudgets.map(category => category.name), ...monthFixedExpenses.map(expense => expense.category)]));
 
   const openAddFixed = () => {
     setFixedName(''); setFixedAmount(''); setFixedDueDay('1');
@@ -149,7 +171,7 @@ export function BudgetScreen({ initialTab = 'Genel Bakış' }: { initialTab?: Bu
     if (fixedForm.mode === 'edit' && fixedForm.currentFixedExpense) {
       dispatch({ type: 'UPDATE_FIXED_EXPENSE', payload: { ...fixedForm.currentFixedExpense, name: fixedName.trim(), amount, dueDay, category: fixedCategory, frequency: fixedFrequency, updatedAt: now } });
     } else {
-      dispatch({ type: 'ADD_FIXED_EXPENSE', payload: { id: crypto.randomUUID(), name: fixedName.trim(), amount, dueDay, category: fixedCategory, frequency: fixedFrequency, active: true, monthKey: getMonthKey(), createdAt: now, updatedAt: now, userId: 'local-user' } });
+      dispatch({ type: 'ADD_FIXED_EXPENSE', payload: { id: crypto.randomUUID(), name: fixedName.trim(), amount, dueDay, category: fixedCategory, frequency: fixedFrequency, active: true, monthKey: state.selectedMonthKey, createdAt: now, updatedAt: now, userId: 'local-user' } });
     }
     setFixedForm({ isOpen: false, mode: 'add' });
   };
@@ -176,6 +198,7 @@ export function BudgetScreen({ initialTab = 'Genel Bakış' }: { initialTab?: Bu
       name: categoryName.trim(),
       limit,
       color: categoryColor.trim() || '#538b67',
+      monthKey: state.selectedMonthKey,
     };
     dispatch({ type: categoryForm.mode === 'edit' ? 'UPDATE_CATEGORY_BUDGET' : 'ADD_CATEGORY_BUDGET', payload });
     setCategoryForm({ isOpen: false, mode: 'add' });
@@ -186,11 +209,12 @@ export function BudgetScreen({ initialTab = 'Genel Bakış' }: { initialTab?: Bu
   return (
   <div className="screen">
     <PageHeader eyebrow="AYLIK PLAN" title="Bütçe" description="Parana ay başında görev ver." />
+    <MonthNavigation />
     <nav className="tabs">{tabs.map(value => <button key={value} className={tab === value ? 'active' : ''} onClick={() => setTab(value)}>{value}</button>)}</nav>
     {tab === 'Genel Bakış' && <><div className="metric-grid"><Metric label="Toplam gelir" value={formatCurrency(summary.totalIncome)} /><Metric label="Korumaya alınan yatırım" value={formatCurrency(summary.totalFixedInvestment)} /><Metric label="Otomatik gider" value={formatCurrency(summary.totalAutomaticExpenses)} /><Metric label="Serbest bütçe" value={formatCurrency(summary.remainingBudget)} /></div><section className="budget-flow"><h2>Paranın dağılımı</h2>{[['Yatırım', summary.totalFixedInvestment, 'gold'], ['Otomatik giderler', summary.totalAutomaticExpenses, 'clay'], ['Gerçekleşen harcama', summary.totalVariableExpenses, 'green']].map(([name, value, tone]) => <div className="budget-line" key={String(name)}><div><span>{name}</span><b>{formatCurrency(Number(value))}</b></div><Progress value={Number(value) / summary.totalIncome * 100} tone={tone as 'gold' | 'clay' | 'green'} /></div>)}</section></>}
-    {tab === 'Gelirler' && <section className="data-card"><button className="add-inline" onClick={openAddIncome}><Icon name="plus" /> Yeni gelir</button><div className="data-card__header"><b>Gelir kaynakları</b><strong>{formatCurrency(summary.totalIncome)}</strong></div>{state.incomes.map(item => <div className="data-row" key={item.id}><span className="status-dot status-dot--green"/><span className="data-row__main"><b>{item.name}</b><small>{item.recurring ? 'Her ay' : 'Tek seferlik'}</small></span><strong>{formatCurrency(item.amount)}</strong><button className="delete-button" onClick={() => openEditIncome(item)} aria-label="Geliri düzenle"><Icon name="check" /></button><button className="delete-button" onClick={() => deleteIncome(item.id)} aria-label="Geliri sil"><Icon name="trash" /></button></div>)}</section>}
-    {tab === 'Otomatik Giderler' && <section className="data-card"><button className="add-inline" onClick={openAddFixed}><Icon name="plus" /> Yeni otomatik gider</button><div className="data-card__header"><b>Otomatik ödemeler</b><span>Aktif giderler bütçeden ayrılır</span></div>{state.fixedExpenses.map(item => <div className={`data-row ${item.active ? '' : 'muted-row'}`} key={item.id}><span className="date-badge">{item.dueDay}<small>GÜN</small></span><span className="data-row__main"><b>{item.name}</b><small>{item.category}</small></span><strong>{formatCurrency(item.amount)}</strong><button className="delete-button" onClick={() => openEditFixed(item)} aria-label="Gideri düzenle"><Icon name="check" /></button><button className="delete-button" onClick={() => deleteFixed(item.id)} aria-label="Gideri sil"><Icon name="trash" /></button><button className={`switch ${item.active ? 'active' : ''}`} aria-label={`${item.name} durumunu değiştir`} onClick={() => dispatch({ type: 'TOGGLE_FIXED', id: item.id })}><span /></button></div>)}</section>}
-    {tab === 'Kategoriler' && <section className="category-grid"><button className="add-inline" onClick={openAddCategory}><Icon name="plus" /> Yeni kategori</button>{state.categoryBudgets.map(cat => { const spent = state.expenses.filter(e => e.monthKey === getMonthKey() && e.category === cat.name).reduce((sum, e) => sum + e.amount, 0); return (<div key={cat.id} className="category-card-wrapper"><article className="category-card"><div><span className="category-dot" style={{ background: cat.color }}/><b>{cat.name}</b><strong>{Math.round(spent / cat.limit * 100)}%</strong></div><h3>{formatCurrency(cat.limit - spent)}</h3><p>{formatCurrency(spent)} harcandı · {formatCurrency(cat.limit)} limit</p><Progress value={spent / cat.limit * 100} /></article><div className="category-actions"><button className="delete-button" onClick={() => openEditCategory(cat)} aria-label="Kategoriyi düzenle"><Icon name="check" /></button><button className="delete-button" onClick={() => deleteCategory(cat.id)} aria-label="Kategoriyi sil"><Icon name="trash" /></button></div></div>); })}</section>}
+    {tab === 'Gelirler' && <section className="data-card"><button className="add-inline" onClick={openAddIncome}><Icon name="plus" /> Yeni gelir</button><div className="data-card__header"><b>Gelir kaynakları</b><strong>{formatCurrency(summary.totalIncome)}</strong></div>{monthIncomes.map(item => <div className="data-row" key={item.id}><span className="status-dot status-dot--green"/><span className="data-row__main"><b>{item.name}</b><small>{item.recurring ? 'Her ay' : 'Tek seferlik'}</small></span><strong>{formatCurrency(item.amount)}</strong><button className="delete-button" onClick={() => openEditIncome(item)} aria-label="Geliri düzenle"><Icon name="check" /></button><button className="delete-button" onClick={() => deleteIncome(item.id)} aria-label="Geliri sil"><Icon name="trash" /></button></div>)}</section>}
+    {tab === 'Otomatik Giderler' && <section className="data-card"><button className="add-inline" onClick={openAddFixed}><Icon name="plus" /> Yeni otomatik gider</button><div className="data-card__header"><b>Otomatik ödemeler</b><span>Aktif giderler bütçeden ayrılır</span></div>{monthFixedExpenses.map(item => <div className={`data-row ${item.active ? '' : 'muted-row'}`} key={item.id}><span className="date-badge">{item.dueDay}<small>GÜN</small></span><span className="data-row__main"><b>{item.name}</b><small>{item.category}</small></span><strong>{formatCurrency(item.amount)}</strong><button className="delete-button" onClick={() => openEditFixed(item)} aria-label="Gideri düzenle"><Icon name="check" /></button><button className="delete-button" onClick={() => deleteFixed(item.id)} aria-label="Gideri sil"><Icon name="trash" /></button><button className={`switch ${item.active ? 'active' : ''}`} aria-label={`${item.name} durumunu değiştir`} onClick={() => dispatch({ type: 'TOGGLE_FIXED', id: item.id })}><span /></button></div>)}</section>}
+    {tab === 'Kategoriler' && <section className="category-grid"><button className="add-inline" onClick={openAddCategory}><Icon name="plus" /> Yeni kategori</button>{monthCategoryBudgets.map(cat => { const spent = state.expenses.filter(e => e.monthKey === state.selectedMonthKey && e.category === cat.name).reduce((sum, e) => sum + e.amount, 0); return (<div key={cat.id} className="category-card-wrapper"><article className="category-card"><div><span className="category-dot" style={{ background: cat.color }}/><b>{cat.name}</b><strong>{Math.round(spent / cat.limit * 100)}%</strong></div><h3>{formatCurrency(cat.limit - spent)}</h3><p>{formatCurrency(spent)} harcandı · {formatCurrency(cat.limit)} limit</p><Progress value={spent / cat.limit * 100} /></article><div className="category-actions"><button className="delete-button" onClick={() => openEditCategory(cat)} aria-label="Kategoriyi düzenle"><Icon name="check" /></button><button className="delete-button" onClick={() => deleteCategory(cat.id)} aria-label="Kategoriyi sil"><Icon name="trash" /></button></div></div>); })}</section>}
 
     {incomeForm.isOpen && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setIncomeForm({ isOpen: false, mode: 'add' }); }}>
       <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="income-title">
@@ -230,7 +254,8 @@ export function BudgetScreen({ initialTab = 'Genel Bakış' }: { initialTab?: Bu
 }
 export function InvestmentsScreen() {
   const { state, dispatch } = useAkceStore(); const summary = useSummary();
-  return <div className="screen"><PageHeader eyebrow="GELECEĞE AYRILAN" title="Yatırımlar" description="Önce geleceğini finanse et, sonra bugünü harca." /><div className="protect-banner"><Icon name="target"/><div><b>Yatırım bütçen koruma altında</b><p>{formatCurrency(summary.totalFixedInvestment)} harcanabilir bütçeye dahil edilmedi.</p></div><strong>%{Math.round(summary.investmentPlanRealizationRate)}</strong></div><section className="investment-grid">{state.investments.map(item => <article className={`investment-card ${item.completed ? 'completed' : ''}`} key={item.id}><span className="asset-monogram">{item.group.slice(0, 2).toLocaleUpperCase('tr-TR')}</span><div><span>{item.group}</span><h3>{formatCurrency(item.plannedAmount)}</h3><small>Aylık plan</small></div><button onClick={() => dispatch({ type: 'TOGGLE_INVESTMENT', id: item.id })}><span>{item.completed && <Icon name="check"/>}</span>{item.completed ? 'Gerçekleşti' : 'Tamamla'}</button></article>)}</section></div>;
+  const monthInvestments = state.investments.filter(item => item.monthKey === state.selectedMonthKey);
+  return <div className="screen"><PageHeader eyebrow="GELECEĞE AYRILAN" title="Yatırımlar" description="Önce geleceğini finanse et, sonra bugünü harca." /><MonthNavigation /><div className="protect-banner"><Icon name="target"/><div><b>Yatırım bütçen koruma altında</b><p>{formatCurrency(summary.totalFixedInvestment)} harcanabilir bütçeye dahil edilmedi.</p></div><strong>%{Math.round(summary.investmentPlanRealizationRate)}</strong></div><section className="investment-grid">{monthInvestments.map(item => <article className={`investment-card ${item.completed ? 'completed' : ''}`} key={item.id}><span className="asset-monogram">{item.group.slice(0, 2).toLocaleUpperCase('tr-TR')}</span><div><span>{item.group}</span><h3>{formatCurrency(item.plannedAmount)}</h3><small>Aylık plan</small></div><button onClick={() => dispatch({ type: 'TOGGLE_INVESTMENT', id: item.id })}><span>{item.completed && <Icon name="check"/>}</span>{item.completed ? 'Gerçekleşti' : 'Tamamla'}</button></article>)}</section></div>;
 }
 
 export function AssetsScreen() {
@@ -240,7 +265,7 @@ export function AssetsScreen() {
 
 export function CoachScreen() {
   const summary = useSummary(); const advice = coachProvider.getAdvice(summary);
-  return <div className="screen"><PageHeader eyebrow="DİSİPLİN SİNYALLERİ" title="Finans Koçu" description="Hesapların finans motorundan, yorumların kurallardan gelir." /><section className="coach-lead"><Icon name="spark"/><div><span>BUGÜNÜN ODAĞI</span><h2>{advice[0].title}</h2><p>{advice[0].message}</p></div></section><div className="coach-metrics"><Metric label="Günlük güvenli limit" value={formatCurrency(summary.dailySafeLimit)} /><Metric label="3 günlük ortalama" value={formatCurrency(summary.threeDayAverage)} /><Metric label="7 günlük ortalama" value={formatCurrency(summary.sevenDayAverage)} /><Metric label="Tahmini ay sonu gideri (son 7g ort.)" value={formatCurrency(summary.monthEndEstimate)} /></div><section className="signals"><h2>Sinyaller</h2>{advice.slice(1).map(item => <article key={item.title} className={`signal signal--${item.tone}`}><span><Icon name={item.tone === 'success' ? 'check' : 'spark'} /></span><div><b>{item.title}</b><p>{item.message}</p></div></article>)}</section></div>;
+  return <div className="screen"><PageHeader eyebrow="DİSİPLİN SİNYALLERİ" title="Finans Koçu" description="Hesapların finans motorundan, yorumların kurallardan gelir." /><MonthNavigation /><section className="coach-lead"><Icon name="spark"/><div><span>BUGÜNÜN ODAĞI</span><h2>{advice[0].title}</h2><p>{advice[0].message}</p></div></section><div className="coach-metrics"><Metric label="Günlük güvenli limit" value={formatCurrency(summary.dailySafeLimit)} /><Metric label="3 günlük ortalama" value={formatCurrency(summary.threeDayAverage)} /><Metric label="7 günlük ortalama" value={formatCurrency(summary.sevenDayAverage)} /><Metric label="Tahmini ay sonu gideri (son 7g ort.)" value={formatCurrency(summary.monthEndEstimate)} /></div><section className="signals"><h2>Sinyaller</h2>{advice.slice(1).map(item => <article key={item.title} className={`signal signal--${item.tone}`}><span><Icon name={item.tone === 'success' ? 'check' : 'spark'} /></span><div><b>{item.title}</b><p>{item.message}</p></div></article>)}</section></div>;
 }
 
 export function SettingsScreen() {

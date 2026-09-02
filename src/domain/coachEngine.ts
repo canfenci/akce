@@ -13,7 +13,9 @@ export interface CoachProvider {
 export class RuleBasedCoach implements CoachProvider {
   getAdvice(summary: MonthSummary): CoachAdvice[] {
     const advice: CoachAdvice[] = [];
-    if (summary.budgetConsumptionRate > summary.monthProgress + 12) {
+    if (summary.daysLeft === 0 && summary.monthProgress >= 100) {
+      advice.push({ tone: 'info', title: 'Ay tamamlandı', message: 'Bu dönem kapanmış durumda. Sinyaller ayın gerçekleşen sonuçlarını gösteriyor.' });
+    } else if (summary.budgetConsumptionRate > summary.monthProgress + 12) {
       advice.push({ tone: 'warning', title: 'Tempo yükseldi', message: 'Bütçen takvimden hızlı ilerliyor. Bugün isteğe bağlı harcamaları ertele.' });
     } else {
       advice.push({ tone: 'success', title: 'Ritmin dengeli', message: 'Bütçe tüketimin zaman planınla uyumlu. Günlük güvenli sınırını koru.' });

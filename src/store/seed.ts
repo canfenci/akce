@@ -1,5 +1,5 @@
 import { getMonthKey } from '../domain/financeEngine';
-import type { Asset, CategoryBudget, Expense, FixedExpense, Goal, Income, Investment, UserSettings } from '../domain/types';
+import type { Asset, AssetSnapshot, CategoryBudget, Expense, FixedExpense, Goal, Income, Investment, UserSettings } from '../domain/types';
 
 const now = new Date();
 const monthKey = getMonthKey(now);
@@ -12,6 +12,8 @@ const dateAgo = (days: number) => {
 const common = { createdAt: stamp, updatedAt: stamp, userId: 'local-user' };
 
 export interface AkceData {
+  schemaVersion: 2;
+  selectedMonthKey: string;
   expenses: Expense[];
   incomes: Income[];
   fixedExpenses: FixedExpense[];
@@ -19,10 +21,13 @@ export interface AkceData {
   assets: Asset[];
   goals: Goal[];
   categoryBudgets: CategoryBudget[];
+  assetSnapshots: AssetSnapshot[];
   settings: UserSettings;
 }
 
 export const seedData: AkceData = {
+  schemaVersion: 2,
+  selectedMonthKey: monthKey,
   incomes: [
     { id: 'income-1', name: 'Maaş', amount: 82000, date: dateAgo(1), recurring: true, active: true, monthKey, ...common },
     { id: 'income-2', name: 'Ek ders', amount: 18000, date: dateAgo(1), recurring: true, active: true, monthKey, ...common },
@@ -55,10 +60,11 @@ export const seedData: AkceData = {
   ],
   goals: [{ id: 'goal-1', assetGroupId: 'freedom', targetAmount: 1000000, ...common }],
   categoryBudgets: [
-    { id: 'cat-1', name: 'Market', limit: 12000, color: '#538b67' },
-    { id: 'cat-2', name: 'Ulaşım', limit: 6500, color: '#bb8d3f' },
-    { id: 'cat-3', name: 'Sosyal', limit: 5000, color: '#8b6b55' },
-    { id: 'cat-4', name: 'Diğer', limit: 3500, color: '#777d76' },
+    { id: 'cat-1', name: 'Market', limit: 12000, color: '#538b67', monthKey },
+    { id: 'cat-2', name: 'Ulaşım', limit: 6500, color: '#bb8d3f', monthKey },
+    { id: 'cat-3', name: 'Sosyal', limit: 5000, color: '#8b6b55', monthKey },
+    { id: 'cat-4', name: 'Diğer', limit: 3500, color: '#777d76', monthKey },
   ],
+  assetSnapshots: [],
   settings: { currency: 'TL', monthStartDay: 1, showOnboarding: true, ...common },
 };

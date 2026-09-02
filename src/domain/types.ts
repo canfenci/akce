@@ -129,4 +129,13 @@ export interface CategoryBudget {
   name: string;
   limit: number;
   color: string;
+  monthKey: string;
+}
+
+export interface AssetSnapshot {
+  id: string;
+  assetId: string;
+  monthKey: string;
+  amount: number;
+  createdAt: number;
 }
