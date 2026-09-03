@@ -61,7 +61,7 @@ export function calculateMonthSummary(
   const daysLeft = getDaysLeftInMonth(currentDate);
   
   // Günlük güvenli harcama limiti
-  const dailySafeLimit = daysLeft > 0 ? remainingBudget / daysLeft : remainingBudget > 0 ? remainingBudget : 0;
+  const dailySafeLimit = remainingBudget <= 0 ? 0 : daysLeft > 0 ? remainingBudget / daysLeft : remainingBudget;
   
   // Ay ilerleme oranı
   const monthProgress = getMonthProgress(currentDate);

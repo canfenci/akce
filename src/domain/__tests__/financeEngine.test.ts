@@ -478,5 +478,34 @@ expect(summary.sevenDayAverage).toBe(1500);
       expect(summary.daysLeft).toBe(0);
       expect(summary.dailySafeLimit).toBe(70000);
     });
+
+    it('mid-month negative remaining: dailySafeLimit clamped to 0', () => {
+      const expenses: Expense[] = [
+        { id: '1', amount: 90000, category: 'Market', type: 'zorunlu', paymentMethod: 'kart', date: '2024-09-15', monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' }
+      ];
+      // remainingBudget = 100000 - 30000 - 26000 - 90000 = -46000
+      const summary = calculateMonthSummary(incomes, fixedExpenses, investments, expenses, [], new Date('2024-09-15'));
+      expect(summary.remainingBudget).toBe(-46000);
+      expect(summary.daysLeft).toBeGreaterThan(0);
+      expect(summary.dailySafeLimit).toBe(0);
+    });
+
+    it('dailySafeLimit is never negative across all scenarios', () => {
+      const overSpend: Expense[] = [
+        { id: '1', amount: 120000, category: 'Market', type: 'zorunlu', paymentMethod: 'kart', date: '2024-09-10', monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' }
+      ];
+      const summary = calculateMonthSummary(incomes, fixedExpenses, investments, overSpend, [], new Date('2024-09-10'));
+      expect(summary.dailySafeLimit).toBeGreaterThanOrEqual(0);
+      expect(summary.dailySafeLimit).not.toBeLessThan(0);
+    });
+
+    it('Bütçe aşıldı state still driven by remainingBudget, not dailySafeLimit', () => {
+      const expenses: Expense[] = [
+        { id: '1', amount: 90000, category: 'Market', type: 'zorunlu', paymentMethod: 'kart', date: '2024-09-15', monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' }
+      ];
+      const summary = calculateMonthSummary(incomes, fixedExpenses, investments, expenses, [], new Date('2024-09-15'));
+      expect(summary.remainingBudget).toBeLessThan(0);
+      expect(summary.dailySafeLimit).toBe(0);
+    });
   });
 });

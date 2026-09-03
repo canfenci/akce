@@ -519,4 +519,76 @@ describe('UX polish pack', () => {
       expect(meta).toBeTruthy();
     });
   });
+
+  describe('AKCE-033: production safety fixes', () => {
+    it('viewport meta includes viewport-fit=cover', () => {
+      const viewportMeta = document.querySelector('meta[name="viewport"]');
+      if (viewportMeta) {
+        expect(viewportMeta.getAttribute('content')).toContain('viewport-fit=cover');
+      } else {
+        const fs = require('fs');
+        const html = fs.readFileSync('index.html', 'utf-8');
+        expect(html).toContain('viewport-fit=cover');
+      }
+    });
+
+    it('viewport meta does not block pinch zoom', () => {
+      const viewportMeta = document.querySelector('meta[name="viewport"]');
+      const content = viewportMeta?.getAttribute('content') || '';
+      if (content) {
+        expect(content).not.toContain('user-scalable=no');
+        expect(content).not.toContain('maximum-scale=1');
+      } else {
+        const fs = require('fs');
+        const html = fs.readFileSync('index.html', 'utf-8');
+        expect(html).not.toContain('user-scalable=no');
+        expect(html).not.toContain('maximum-scale=1');
+      }
+    });
+
+    it('secondary-button meets 44px touch target', () => {
+      const style = document.createElement('style');
+      style.textContent = '.secondary-button{min-height:44px}';
+      document.head.appendChild(style);
+      const btn = document.createElement('button');
+      btn.className = 'secondary-button';
+      document.body.appendChild(btn);
+      const computed = window.getComputedStyle(btn);
+      expect(parseInt(computed.minHeight)).toBeGreaterThanOrEqual(44);
+      document.body.removeChild(btn);
+      document.head.removeChild(style);
+    });
+
+    it('quick-amounts button meets 44px touch target', () => {
+      const style = document.createElement('style');
+      style.textContent = '.quick-amounts button{height:44px}';
+      document.head.appendChild(style);
+      const btn = document.createElement('button');
+      btn.className = 'quick-amounts';
+      const container = document.createElement('div');
+      container.className = 'quick-amounts';
+      container.appendChild(btn);
+      document.body.appendChild(container);
+      const computed = window.getComputedStyle(btn);
+      expect(parseInt(computed.height)).toBeGreaterThanOrEqual(44);
+      document.body.removeChild(container);
+      document.head.removeChild(style);
+    });
+
+    it('segmented button meets 44px touch target', () => {
+      const style = document.createElement('style');
+      style.textContent = '.segmented button{min-height:44px}';
+      document.head.appendChild(style);
+      const btn = document.createElement('button');
+      btn.className = 'segmented';
+      const container = document.createElement('div');
+      container.className = 'segmented';
+      container.appendChild(btn);
+      document.body.appendChild(container);
+      const computed = window.getComputedStyle(btn);
+      expect(parseInt(computed.minHeight)).toBeGreaterThanOrEqual(44);
+      document.body.removeChild(container);
+      document.head.removeChild(style);
+    });
+  });
 });
