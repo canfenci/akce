@@ -113,6 +113,8 @@ export class FirebaseFinanceRepository implements RealtimeFinanceRepository {
         case 'categoryBudget.update': await this.gateway.updateDocument(monthlyDocumentPath(uid, mutation.value.monthKey, 'categoryBudgets', mutation.value.id), this.updateDto(mutation.value)); break;
         case 'categoryBudget.delete': await this.gateway.deleteDocument(monthlyDocumentPath(uid, mutation.monthKey, 'categoryBudgets', mutation.id)); break;
         case 'asset.update': await this.gateway.updateDocument(globalDocumentPath(uid, 'assets', mutation.value.id), this.updateDto(mutation.value)); break;
+        case 'asset.create': await this.gateway.setDocument(globalDocumentPath(uid, 'assets', mutation.value.id), this.dto(mutation.value)); break;
+        case 'asset.delete': await this.gateway.deleteDocument(globalDocumentPath(uid, 'assets', mutation.id)); break;
         case 'month.initialize': {
           const now = Date.now();
           const operations: GatewayBatchOperation[] = [{ type: 'set', path: monthPath(uid, mutation.value.monthKey), data: { monthKey: mutation.value.monthKey, schemaVersion: 2, deviceId: this.deviceId, createdAt: now, updatedAt: now, serverUpdatedAt: this.gateway.serverTimestamp() }, merge: true }];

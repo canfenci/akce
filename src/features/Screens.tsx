@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { coachProvider } from '../domain/coachEngine';
 import { calculateMonthSummary, formatCurrency, formatPercentage, getAssetProgress, getMonthKey, getTotalAssets, getTotalAssetTargets } from '../domain/financeEngine';
 import { formatMonthKey, getMonthCalculationDate, shiftMonthKey } from '../domain/month';
-import type { Income, FixedExpense, CategoryBudget } from '../domain/types';
+import type { Asset, AssetGroup, Income, FixedExpense, CategoryBudget } from '../domain/types';
+import { ASSET_GROUPS, ASSET_GROUP_LABELS } from '../domain/types';
 import { useAkceStore } from '../store/AkceStore';
 import { getIsDeviceTrusted, setIsDeviceTrusted } from '../store/devicePreference';
 import { Icon } from '../components/Icon';
@@ -293,44 +294,125 @@ export function InvestmentsScreen() {
   return <div className="screen"><PageHeader eyebrow="GELECEĞE AYRILAN" title="Yatırımlar" description="Önce geleceğini finanse et, sonra bugünü harca." /><MonthNavigation /><div className="protect-banner"><Icon name="target"/><div><b>Yatırım bütçen koruma altında</b><p>{formatCurrency(summary.totalFixedInvestment)} harcanabilir bütçeye dahil edilmedi.</p></div><strong>%{Math.round(summary.investmentPlanRealizationRate)}</strong></div><section className="investment-grid">{monthInvestments.map(item => <article className={`investment-card ${item.completed ? 'completed' : ''}`} key={item.id}><span className="asset-monogram">{item.group.slice(0, 2).toLocaleUpperCase('tr-TR')}</span><div className="investment-card__details"><div><span>{item.group}</span><h3>{formatCurrency(item.plannedAmount)}</h3><small>Aylık plan</small></div>{item.actualAmount > 0 && <span className="investment-card__actual">Gerçekleşen: <b>{formatCurrency(item.actualAmount)}</b></span>}</div><button onClick={() => dispatch({ type: 'TOGGLE_INVESTMENT', id: item.id })}><span>{item.completed && <Icon name="check"/>}</span>{item.completed ? 'Tamamlandı' : 'Tamamla'}</button></article>)}</section></div>;
 }
 
+type AssetFormMode = 'add' | 'edit';
+interface AssetFormState {
+  isOpen: boolean;
+  mode: AssetFormMode;
+  currentAsset?: Asset;
+}
+
 export function AssetsScreen() {
-  const { state, dispatch } = useAkceStore(); const total = getTotalAssets(state.assets); const target = getTotalAssetTargets(state.assets);
-  const [assetForm, setAssetForm] = useState<{ isOpen: boolean; currentAsset?: typeof state.assets[number] }>({ isOpen: false });
+  const { state, dispatch } = useAkceStore();
+  const total = getTotalAssets(state.assets);
+  const target = getTotalAssetTargets(state.assets);
+  const goal = state.goals[0];
+
+  const [assetForm, setAssetForm] = useState<AssetFormState>({ isOpen: false, mode: 'add' });
+  const [assetGroup, setAssetGroup] = useState<AssetGroup>('TEFAS');
   const [currentAmount, setCurrentAmount] = useState('');
   const [targetAmount, setTargetAmount] = useState('');
   const [formError, setFormError] = useState('');
 
-  const openAssetEdit = (asset: typeof state.assets[number]) => {
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; asset?: Asset }>({ isOpen: false });
+
+  const closeAssetForm = () => { setAssetForm({ isOpen: false, mode: 'add' }); setFormError(''); };
+  const closeDeleteConfirm = () => setDeleteConfirm({ isOpen: false });
+
+  const assetSheetRef = useDialogSheet(assetForm.isOpen, closeAssetForm);
+  const deleteSheetRef = useDialogSheet(deleteConfirm.isOpen, closeDeleteConfirm);
+  const viewportHeight = useVisualViewportHeight();
+  const sheetMaxHeight = viewportHeight > 0 ? `${Math.floor(viewportHeight * 0.94)}px` : '94vh';
+
+  const openAddAsset = () => {
+    setAssetGroup('TEFAS'); setCurrentAmount(''); setTargetAmount(''); setFormError('');
+    setAssetForm({ isOpen: true, mode: 'add' });
+  };
+
+  const openEditAsset = (asset: Asset) => {
+    setAssetGroup(asset.group);
     setCurrentAmount(String(asset.currentAmount));
     setTargetAmount(String(asset.targetAmount));
     setFormError('');
-    setAssetForm({ isOpen: true, currentAsset: asset });
+    setAssetForm({ isOpen: true, mode: 'edit', currentAsset: asset });
   };
 
   const saveAsset = () => {
     const cur = Number(currentAmount);
     const tgt = Number(targetAmount);
     if (!Number.isFinite(cur) || cur < 0) { setFormError('Mevcut tutar 0 veya daha büyük olmalı.'); return; }
-    if (!Number.isFinite(tgt) || tgt <= 0) { setFormError('Hedef tutar 0\'dan büyük olmalı.'); return; }
-    if (!assetForm.currentAsset) return;
-    dispatch({ type: 'UPDATE_ASSET', id: assetForm.currentAsset.id, amount: cur, targetAmount: tgt });
+    if (!Number.isFinite(tgt) || tgt < 0) { setFormError('Hedef tutar 0 veya daha büyük olmalı.'); return; }
+    const now = Date.now();
+    if (assetForm.mode === 'edit' && assetForm.currentAsset) {
+      dispatch({ type: 'UPDATE_ASSET', id: assetForm.currentAsset.id, amount: cur, targetAmount: tgt });
+    } else {
+      dispatch({ type: 'ADD_ASSET', payload: { id: crypto.randomUUID(), group: assetGroup, currentAmount: cur, targetAmount: tgt, createdAt: now, updatedAt: now, userId: 'local-user' } });
+    }
     closeAssetForm();
   };
 
-  const closeAssetForm = () => { setAssetForm({ isOpen: false }); setFormError(''); };
-  const assetSheetRef = useDialogSheet(assetForm.isOpen, closeAssetForm);
-  const viewportHeight = useVisualViewportHeight();
-  const sheetMaxHeight = viewportHeight > 0 ? `${Math.floor(viewportHeight * 0.94)}px` : '94vh';
+  const openDeleteConfirm = (asset: Asset) => setDeleteConfirm({ isOpen: true, asset });
 
-  return <div className="screen"><PageHeader eyebrow="ÖZGÜRLÜK KASASI" title="Varlıklar & Hedefler" description="Finansal özgürlüğe olan mesafeni görünür kıl." /><section className="assets-hero"><span>TOPLAM FİNANSAL VARLIK</span><strong>{formatCurrency(total)}</strong><p>Genel hedef: {formatCurrency(target)}</p><Progress value={total / target * 100} tone="gold"/><small>%{Math.round(total / target * 100)} tamamlandı · {formatCurrency(target - total)} kaldı</small></section><section className="asset-grid">{state.assets.map(asset => { const progress = getAssetProgress(asset); return <article className="asset-card" key={asset.id}><header><span className="asset-monogram">{asset.group.slice(0, 2).toLocaleUpperCase('tr-TR')}</span><div><b>{asset.group}</b><small>Hedefin %{Math.round(progress)}'i</small></div></header><h3>{formatCurrency(asset.currentAmount)}</h3><p>{formatCurrency(asset.targetAmount)} hedef</p><Progress value={progress} tone="gold"/><div><span>Hedefe kalan</span><b>{formatCurrency(Math.max(0, asset.targetAmount - asset.currentAmount))}</b></div><button onClick={() => openAssetEdit(asset)}>Düzenle</button></article>; })}</section>
-    {assetForm.isOpen && assetForm.currentAsset && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) closeAssetForm(); }}>
-      <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="asset-edit-title" ref={assetSheetRef} style={{ maxHeight: sheetMaxHeight }}>
+  const confirmDelete = () => {
+    if (deleteConfirm.asset) {
+      dispatch({ type: 'DELETE_ASSET', id: deleteConfirm.asset.id });
+    }
+    closeDeleteConfirm();
+  };
+
+  const progressPct = target > 0 ? (total / target) * 100 : 0;
+
+  return <div className="screen">
+    <PageHeader eyebrow="ÖZGÜRLÜK KASASI" title="Varlıklar & Hedefler" description="Finansal özgürlüğe olan mesafeni görünür kıl." />
+
+    <section className="assets-hero">
+      <span>TOPLAM FİNANSAL VARLIK</span>
+      <strong>{formatCurrency(total)}</strong>
+      {goal ? <p>Genel hedef: {formatCurrency(goal.targetAmount)}</p> : <p>Henüz hedef belirlenmedi</p>}
+      {goal && <><Progress value={progressPct} tone="gold" /><small>%{Math.round(progressPct)} tamamlandı · {formatCurrency(Math.max(0, goal.targetAmount - total))} kaldı</small></>}
+    </section>
+
+    <button className="add-inline" onClick={openAddAsset}><Icon name="plus" /> Varlık ekle</button>
+
+    {state.assets.length === 0
+      ? <section className="empty-state"><Icon name="target" /><p><b>Henüz varlık eklemedin.</b></p><small>İlk varlığını ekleyerek finansal özgürlük takibini başlat.</small></section>
+      : <section className="asset-grid">{state.assets.map(asset => {
+          const progress = getAssetProgress(asset);
+          return <article className="asset-card" key={asset.id}>
+            <header>
+              <span className="asset-monogram">{asset.group.slice(0, 2).toLocaleUpperCase('tr-TR')}</span>
+              <div><b>{ASSET_GROUP_LABELS[asset.group]}</b><small>{asset.targetAmount > 0 ? `Hedefin %${Math.round(progress)}'i` : 'Hedef belirlenmemiş'}</small></div>
+            </header>
+            <h3>{formatCurrency(asset.currentAmount)}</h3>
+            {asset.targetAmount > 0 && <p>{formatCurrency(asset.targetAmount)} hedef</p>}
+            {asset.targetAmount > 0 && <><Progress value={progress} tone="gold" /><div><span>Hedefe kalan</span><b>{formatCurrency(Math.max(0, asset.targetAmount - asset.currentAmount))}</b></div></>}
+            <div className="asset-card__actions">
+              <button className="delete-button" onClick={() => openEditAsset(asset)} aria-label="Varlığı düzenle"><Icon name="edit" /></button>
+              <button className="delete-button" onClick={() => openDeleteConfirm(asset)} aria-label="Varlığı sil"><Icon name="trash" /></button>
+            </div>
+          </article>;
+        })}</section>}
+
+    {assetForm.isOpen && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) closeAssetForm(); }}>
+      <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="asset-form-title" ref={assetSheetRef} style={{ maxHeight: sheetMaxHeight }}>
         <div className="sheet__handle" />
-        <header className="sheet__header"><div><span className="eyebrow">VARLIK DÜZENLE</span><h2 id="asset-edit-title">{assetForm.currentAsset.group}</h2></div><button className="icon-button" onClick={closeAssetForm} aria-label="Kapat"><Icon name="close" /></button></header>
-        <label className="amount-input"><span>Mevcut tutar</span><div><input autoFocus inputMode="decimal" value={currentAmount} onChange={e => { setCurrentAmount(e.target.value.replace(/[^0-9.]/g, '')); setFormError(''); }} placeholder="0" aria-label="Mevcut tutar"/><b>TL</b></div></label>
-        <label className="amount-input"><span>Hedef tutar</span><div><input inputMode="decimal" value={targetAmount} onChange={e => { setTargetAmount(e.target.value.replace(/[^0-9.]/g, '')); setFormError(''); }} placeholder="0" aria-label="Hedef tutar"/><b>TL</b></div></label>
+        <header className="sheet__header"><div><span className="eyebrow">VARLIK</span><h2 id="asset-form-title">{assetForm.mode === 'add' ? 'Yeni varlık' : 'Varlığı düzenle'}</h2></div><button className="icon-button" onClick={closeAssetForm} aria-label="Kapat"><Icon name="close" /></button></header>
+        <label className="field">Tür / kategori<select value={assetGroup} onChange={e => setAssetGroup(e.target.value as AssetGroup)}>{ASSET_GROUPS.map(g => <option key={g} value={g}>{ASSET_GROUP_LABELS[g]}</option>)}</select></label>
+        <label className="amount-input"><span>Güncel değer</span><div><input autoFocus inputMode="decimal" value={currentAmount} onChange={e => { setCurrentAmount(e.target.value.replace(/[^0-9.]/g, '')); setFormError(''); }} placeholder="0" aria-label="Güncel değer" /><b>TL</b></div></label>
+        <label className="amount-input"><span>Hedef değer (isteğe bağlı)</span><div><input inputMode="decimal" value={targetAmount} onChange={e => { setTargetAmount(e.target.value.replace(/[^0-9.]/g, '')); setFormError(''); }} placeholder="0" aria-label="Hedef değer" /><b>TL</b></div></label>
         {formError && <p className="form-error">{formError}</p>}
-        <button className="primary-button" disabled={!Number.isFinite(Number(currentAmount)) || Number(currentAmount) < 0 || !Number.isFinite(Number(targetAmount)) || Number(targetAmount) <= 0} onClick={saveAsset}>Kaydet</button>
+        <button className="primary-button" onClick={saveAsset}>{assetForm.mode === 'add' ? 'Varlığı kaydet' : 'Güncelle'}</button>
+      </section>
+    </div>}
+
+    {deleteConfirm.isOpen && deleteConfirm.asset && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) closeDeleteConfirm(); }}>
+      <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="delete-confirm-title" ref={deleteSheetRef} style={{ maxHeight: sheetMaxHeight }}>
+        <div className="sheet__handle" />
+        <header className="sheet__header"><div><span className="eyebrow">VARLIK SİL</span><h2 id="delete-confirm-title">Varlığı sil</h2></div><button className="icon-button" onClick={closeDeleteConfirm} aria-label="Kapat"><Icon name="close" /></button></header>
+        <p className="delete-confirm-text"><b>{ASSET_GROUP_LABELS[deleteConfirm.asset.group]}</b> varlığını silmek istediğine emin misin? Bu işlem geri alınamaz.</p>
+        <div className="delete-confirm-actions">
+          <button className="secondary-button" onClick={closeDeleteConfirm}>İptal</button>
+          <button className="primary-button primary-button--danger" onClick={confirmDelete}>Evet, sil</button>
+        </div>
       </section>
     </div>}
   </div>;

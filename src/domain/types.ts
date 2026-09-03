@@ -53,9 +53,25 @@ export interface Investment {
   userId: string;
 }
 
+export type AssetGroup = 'TEFAS' | 'Nasdaq' | 'Altın' | 'Gümüş' | 'BES' | 'Nakit' | 'Mevduat' | 'Kripto' | 'Diğer';
+
+export const ASSET_GROUP_LABELS: Record<AssetGroup, string> = {
+  TEFAS: 'TEFAS',
+  Nasdaq: 'ABD / Nasdaq',
+  Altın: 'Altın',
+  Gümüş: 'Gümüş',
+  BES: 'BES',
+  Nakit: 'Nakit',
+  Mevduat: 'Mevduat',
+  Kripto: 'Kripto',
+  Diğer: 'Diğer',
+};
+
+export const ASSET_GROUPS: AssetGroup[] = ['TEFAS', 'Nasdaq', 'Altın', 'Gümüş', 'BES', 'Nakit', 'Mevduat', 'Kripto', 'Diğer'];
+
 export interface Asset {
   id: string;
-  group: 'TEFAS' | 'Nasdaq' | 'Altın' | 'Gümüş' | 'BES';
+  group: AssetGroup;
   currentAmount: number;
   targetAmount: number;
   createdAt: number;

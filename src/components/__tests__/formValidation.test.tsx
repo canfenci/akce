@@ -207,4 +207,114 @@ describe('Budget form validation', () => {
     expect(updated?.currentAmount).toBe(50000);
     expect(updated?.targetAmount).toBe(200000);
   });
+
+  it('reducer handles ADD_ASSET action', () => {
+    const state = seedData;
+    const newAsset = {
+      id: 'asset-new-1',
+      group: 'Nakit' as const,
+      currentAmount: 25000,
+      targetAmount: 50000,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      userId: 'local-user',
+    };
+    const next = reducer(state, { type: 'ADD_ASSET', payload: newAsset });
+    expect(next.assets.some(a => a.id === 'asset-new-1')).toBe(true);
+    expect(next.assets.find(a => a.id === 'asset-new-1')?.group).toBe('Nakit');
+  });
+
+  it('reducer handles DELETE_ASSET action', () => {
+    const state = seedData;
+    const assetId = state.assets[0]?.id;
+    if (!assetId) return;
+    const next = reducer(state, { type: 'DELETE_ASSET', id: assetId });
+    expect(next.assets.some(a => a.id === assetId)).toBe(false);
+  });
+
+  it('total assets recalculates after ADD_ASSET', () => {
+    const state = seedData;
+    const prevTotal = state.assets.reduce((s, a) => s + a.currentAmount, 0);
+    const newAsset = {
+      id: 'asset-extra',
+      group: 'Kripto' as const,
+      currentAmount: 10000,
+      targetAmount: 0,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      userId: 'local-user',
+    };
+    const next = reducer(state, { type: 'ADD_ASSET', payload: newAsset });
+    const newTotal = next.assets.reduce((s, a) => s + a.currentAmount, 0);
+    expect(newTotal).toBe(prevTotal + 10000);
+  });
+
+  it('total assets recalculates after DELETE_ASSET', () => {
+    const state = seedData;
+    const assetId = state.assets[0]?.id;
+    if (!assetId) return;
+    const assetAmount = state.assets.find(a => a.id === assetId)?.currentAmount ?? 0;
+    const prevTotal = state.assets.reduce((s, a) => s + a.currentAmount, 0);
+    const next = reducer(state, { type: 'DELETE_ASSET', id: assetId });
+    const newTotal = next.assets.reduce((s, a) => s + a.currentAmount, 0);
+    expect(newTotal).toBe(prevTotal - assetAmount);
+  });
+
+  it('total assets recalculates after UPDATE_ASSET', () => {
+    const state = seedData;
+    const assetId = state.assets[0]?.id;
+    if (!assetId) return;
+    const next = reducer(state, { type: 'UPDATE_ASSET', id: assetId, amount: 99999 });
+    const updated = next.assets.find(a => a.id === assetId);
+    expect(updated?.currentAmount).toBe(99999);
+  });
+
+  it('zero-assets empty state produces empty assets array', () => {
+    const state = { ...seedData, assets: [] as { currentAmount: number }[] };
+    const total = state.assets.reduce((s, a) => s + a.currentAmount, 0);
+    expect(total).toBe(0);
+    expect(state.assets.length).toBe(0);
+  });
+
+  it('optional target calculation works with targetAmount 0', () => {
+    const asset = { id: 'x', group: 'Nakit' as const, currentAmount: 5000, targetAmount: 0, createdAt: 0, updatedAt: 0, userId: 'u' };
+    const progress = asset.targetAmount > 0 ? (asset.currentAmount / asset.targetAmount) * 100 : 0;
+    expect(progress).toBe(0);
+  });
+
+  it('existing UPDATE_ASSET preserves targetAmount when not provided', () => {
+    const state = seedData;
+    const assetId = state.assets[0]?.id;
+    if (!assetId) return;
+    const originalTarget = state.assets.find(a => a.id === assetId)?.targetAmount;
+    const next = reducer(state, { type: 'UPDATE_ASSET', id: assetId, amount: 77777 });
+    const updated = next.assets.find(a => a.id === assetId);
+    expect(updated?.currentAmount).toBe(77777);
+    expect(updated?.targetAmount).toBe(originalTarget);
+  });
+
+  it('asset create maps to asset.create Firestore mutation', async () => {
+    const { mapActionToMutation } = await import('../../store/AkceStore');
+    const asset = { id: 'a1', group: 'Altın' as const, currentAmount: 1000, targetAmount: 2000, createdAt: 1, updatedAt: 1, userId: 'u' };
+    const mutation = mapActionToMutation({ type: 'ADD_ASSET', payload: asset }, seedData);
+    expect(mutation).toEqual({ type: 'asset.create', value: asset });
+  });
+
+  it('asset delete maps to asset.delete Firestore mutation', async () => {
+    const { mapActionToMutation } = await import('../../store/AkceStore');
+    const assetId = seedData.assets[0]?.id;
+    if (!assetId) return;
+    const mutation = mapActionToMutation({ type: 'DELETE_ASSET', id: assetId }, seedData);
+    expect(mutation).toEqual({ type: 'asset.delete', id: assetId });
+  });
+
+  it('all new asset groups are valid in ASSET_GROUPS', async () => {
+    const { ASSET_GROUPS, ASSET_GROUP_LABELS } = await import('../../domain/types');
+    expect(ASSET_GROUPS).toContain('Nakit');
+    expect(ASSET_GROUPS).toContain('Mevduat');
+    expect(ASSET_GROUPS).toContain('Kripto');
+    expect(ASSET_GROUPS).toContain('Diğer');
+    expect(ASSET_GROUP_LABELS['Nakit']).toBe('Nakit');
+    expect(ASSET_GROUP_LABELS['Kripto']).toBe('Kripto');
+  });
 });

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type Dispatch, type ReactNode } from 'react';
-import type { Expense, Income, FixedExpense, CategoryBudget } from '../domain/types';
+import type { Asset, Expense, Income, FixedExpense, CategoryBudget } from '../domain/types';
 import { seedData, type AkceData } from './seed';
 import { localStorageFinanceRepository, storageKey, emptyFinanceState } from './localStorageFinanceRepository';
 import { createFirebaseFinanceRepository } from './firebaseFinanceRepository';
@@ -18,6 +18,8 @@ export type Action =
   | { type: 'TOGGLE_FIXED'; id: string }
   | { type: 'TOGGLE_INVESTMENT'; id: string }
   | { type: 'UPDATE_ASSET'; id: string; amount: number; targetAmount?: number }
+  | { type: 'ADD_ASSET'; payload: Asset }
+  | { type: 'DELETE_ASSET'; id: string }
   | { type: 'ADD_FIXED_EXPENSE'; payload: FixedExpense }
   | { type: 'UPDATE_FIXED_EXPENSE'; payload: FixedExpense }
   | { type: 'DELETE_FIXED_EXPENSE'; id: string }
@@ -89,6 +91,8 @@ export function reducer(state: AkceData, action: Action): AkceData {
     case 'INITIALIZE_MONTH': return initializeMonth(state, action.sourceMonthKey, action.targetMonthKey);
     case 'TOGGLE_INVESTMENT': return { ...state, investments: state.investments.map(item => item.id === action.id ? { ...item, completed: !item.completed, actualAmount: item.completed ? 0 : item.plannedAmount, completedDate: item.completed ? undefined : new Date().toISOString().slice(0, 10), updatedAt: Date.now() } : item) };
     case 'UPDATE_ASSET': return { ...state, assets: state.assets.map(item => item.id === action.id ? { ...item, currentAmount: Math.max(0, action.amount), targetAmount: action.targetAmount !== undefined ? Math.max(0, action.targetAmount) : item.targetAmount, updatedAt: Date.now() } : item) };
+    case 'ADD_ASSET': return { ...state, assets: [action.payload, ...state.assets] };
+    case 'DELETE_ASSET': return { ...state, assets: state.assets.filter(item => item.id !== action.id) };
     case 'SET_ONBOARDING': return { ...state, settings: { ...state.settings, showOnboarding: action.value, updatedAt: Date.now() } };
     case 'RESET': return { ...seedData, settings: { ...seedData.settings, showOnboarding: false } };
     case 'RESET_FINANCE_DATA': return { ...emptyFinanceState, selectedMonthKey: state.selectedMonthKey };
@@ -118,7 +122,7 @@ interface StoreContextValue {
 
 const StoreContext = createContext<StoreContextValue | null>(null);
 
-function mapActionToMutation(action: Action, currentState: AkceData): FinanceMutation | null {
+export function mapActionToMutation(action: Action, currentState: AkceData): FinanceMutation | null {
   switch (action.type) {
     case 'ADD_EXPENSE': return { type: 'expense.create', value: action.payload };
     case 'REMOVE_EXPENSE': {
@@ -169,6 +173,8 @@ function mapActionToMutation(action: Action, currentState: AkceData): FinanceMut
       const item = currentState.assets.find(a => a.id === action.id);
       return item ? { type: 'asset.update', value: { ...item, currentAmount: Math.max(0, action.amount), targetAmount: action.targetAmount !== undefined ? Math.max(0, action.targetAmount) : item.targetAmount, updatedAt: Date.now() } } : null;
     }
+    case 'ADD_ASSET': return { type: 'asset.create', value: action.payload };
+    case 'DELETE_ASSET': return { type: 'asset.delete', id: action.id };
     case 'INITIALIZE_MONTH': {
       const nextState = initializeMonth(currentState, action.sourceMonthKey, action.targetMonthKey);
       return {

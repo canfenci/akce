@@ -52,6 +52,8 @@ export type FinanceMutation =
   | { type: 'categoryBudget.update'; value: CategoryBudget }
   | { type: 'categoryBudget.delete'; monthKey: string; id: string }
   | { type: 'asset.update'; value: Asset }
+  | { type: 'asset.create'; value: Asset }
+  | { type: 'asset.delete'; id: string }
   | { type: 'month.initialize'; value: MonthInitializationPayload };
 
 export interface RealtimeFinanceRepository extends FinanceRepository {
