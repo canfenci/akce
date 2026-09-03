@@ -72,6 +72,7 @@ export function HomeScreen({ goTo }: { goTo: (page: string) => void }) {
   const totalAssets = getTotalAssets(state.assets);
   const assetTargets = getTotalAssetTargets(state.assets);
   const firstName = getFirstName(user?.displayName);
+  const isCurrentMonth = state.selectedMonthKey === getMonthKey();
   const actualInvestments = state.investments.filter(item => item.monthKey === state.selectedMonthKey).reduce((sum, item) => sum + item.actualAmount, 0);
   const investmentRatio = calculateInvestmentRatio(summary.totalIncome, actualInvestments);
   const expenseRatio = calculateExpenseRatio(summary.totalIncome, summary.totalAutomaticExpenses, summary.totalVariableExpenses);
@@ -79,7 +80,7 @@ export function HomeScreen({ goTo }: { goTo: (page: string) => void }) {
     <header className="home-welcome"><div><span className="eyebrow">{formatMonthKey(state.selectedMonthKey).toLocaleUpperCase('tr-TR')}</span><h1>Merhaba{firstName ? `, ${firstName}` : ''}.</h1></div><button className="avatar" aria-label="Profil">MB</button></header>
     <MonthNavigation />
     <section className="hero-balance">
-      <span className="hero-balance__label">BUGÜN GÜVENLE HARCAYABİLECEĞİN</span>
+      <span className="hero-balance__label">{isCurrentMonth ? 'BUGÜN GÜVENLE HARCAYABİLECEĞİN' : 'AY SONUNDA KALAN SERBEST BÜTÇE'}</span>
       {summary.dailySafeLimit > 0
         ? <strong>{formatCurrency(summary.dailySafeLimit)}</strong>
         : <><strong>{formatCurrency(0)}</strong><small style={{ display: 'block', color: 'var(--danger)', fontSize: 12, marginTop: 4 }}>Bütçe aşıldı</small></>}
@@ -89,11 +90,11 @@ export function HomeScreen({ goTo }: { goTo: (page: string) => void }) {
       <span className="eyebrow">GELİR DAĞILIMI</span>
       <div className="income-ratios__grid">
         <div className="income-ratio-card"><span>Yatırım Oranı</span><strong>{formatRatio(investmentRatio)}</strong><small>Gelirinin yatırıma giden kısmı</small></div>
-        <div className="income-ratio-card"><span>Harcama Oranı</span><strong>{formatRatio(expenseRatio)}</strong><small>Gelirinin harcanan kısmı</small></div>
+        <div className="income-ratio-card"><span>Harcama Oranı</span><strong>{formatRatio(expenseRatio)}</strong><small>Gelirinin harcamalara giden kısmı</small></div>
       </div>
     </section>
     <section className="tempo">
-      <div className="tempo__labels"><span>Ayın <b>%{Math.round(summary.monthProgress)}’i</b> geçti</span><span>Bütçenin <b>%{Math.round(summary.budgetConsumptionRate)}’i</b> kullanıldı</span></div>
+      <div className="tempo__labels"><span>Ayın <b>%{Math.round(summary.monthProgress)}’i</b> geçti</span><span>Bütçe kullanım oranı <b>%{Math.round(summary.budgetConsumptionRate)}</b></span></div>
       <div className="tempo__track"><span style={{ width: `${Math.min(100, summary.monthProgress)}%` }} /><b style={{ left: `${Math.min(100, summary.budgetConsumptionRate)}%` }} /></div>
       <p>{summary.budgetConsumptionRate <= summary.monthProgress ? 'Harika, bütçen zamanın gerisinden geliyor.' : 'Bütçe tempon zamanın önünde; bugün daha sakin ilerle.'}</p>
     </section>

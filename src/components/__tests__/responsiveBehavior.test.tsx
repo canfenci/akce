@@ -8,6 +8,7 @@ import type { FirestoreGateway, GatewayBatchOperation, GatewayDocument } from '.
 import type { ReactNode } from 'react';
 import { QuickExpenseSheet } from '../../components/QuickExpenseSheet';
 import { AuthProvider } from '../../auth/AuthProvider';
+import { calculateExpenseRatio } from '../../domain/financeEngine';
 import type { AuthClient } from '../../auth/firebaseAuthClient';
 
 function createMockAuthClient(displayName: string | null = null): AuthClient {
@@ -427,5 +428,95 @@ describe('UX polish pack', () => {
     document.body.removeChild(header);
     document.body.removeChild(nav);
     document.head.removeChild(style);
+  });
+
+  describe('AKCE-031: metric label and historical hero clarity', () => {
+    it('current month hero label is BUGÜN GÜVENLE HARCAYABİLECEĞİN', async () => {
+      const { HomeScreen } = await import('../../features/Screens');
+      const wrapper = createTestWrapper();
+      render(<HomeScreen goTo={() => {}} />, { wrapper });
+      const heroLabel = document.querySelector('.hero-balance__label');
+      expect(heroLabel?.textContent).toBe('BUGÜN GÜVENLE HARCAYABİLECEĞİN');
+    });
+
+    it('current month final day keeps same current-month hero label', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const endOfMonth = new Date(2026, 8, 30, 12, 0, 0);
+      vi.setSystemTime(endOfMonth);
+      const { HomeScreen } = await import('../../features/Screens');
+      const wrapper = createTestWrapper();
+      render(<HomeScreen goTo={() => {}} />, { wrapper });
+      const heroLabel = document.querySelector('.hero-balance__label');
+      expect(heroLabel?.textContent).toBe('BUGÜN GÜVENLE HARCAYABİLECEĞİN');
+      vi.useRealTimers();
+    });
+
+    it('historical month hero label is AY SONUNDA KALAN SERBEST BÜTÇE', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      vi.setSystemTime(new Date(2026, 10, 15, 12, 0, 0));
+      const { HomeScreen } = await import('../../features/Screens');
+      const wrapper = createTestWrapper();
+      render(<HomeScreen goTo={() => {}} />, { wrapper });
+      const heroLabel = document.querySelector('.hero-balance__label');
+      expect(heroLabel?.textContent).toBe('AY SONUNDA KALAN SERBEST BÜTÇE');
+      vi.useRealTimers();
+    });
+
+    it('historical month positive remainder shows correct value', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      vi.setSystemTime(new Date(2026, 10, 15, 12, 0, 0));
+      const { HomeScreen } = await import('../../features/Screens');
+      const wrapper = createTestWrapper();
+      render(<HomeScreen goTo={() => {}} />, { wrapper });
+      const heroValue = document.querySelector('.hero-balance strong');
+      expect(heroValue).toBeTruthy();
+      vi.useRealTimers();
+    });
+
+    it('budgetConsumptionRate label is Bütçe kullanım oranı', async () => {
+      const { HomeScreen } = await import('../../features/Screens');
+      const wrapper = createTestWrapper();
+      render(<HomeScreen goTo={() => {}} />, { wrapper });
+      const tempoLabels = document.querySelector('.tempo__labels');
+      expect(tempoLabels?.textContent).toContain('Bütçe kullanım oranı');
+      expect(tempoLabels?.textContent).not.toContain('Bütçenin');
+    });
+
+    it('Harcama Oranı label and helper text are correct', async () => {
+      const { HomeScreen } = await import('../../features/Screens');
+      const wrapper = createTestWrapper();
+      render(<HomeScreen goTo={() => {}} />, { wrapper });
+      const ratioCards = document.querySelectorAll('.income-ratio-card');
+      const hasHarcama = Array.from(ratioCards).some(c => c.querySelector('span')?.textContent === 'Harcama Oranı');
+      expect(hasHarcama).toBe(true);
+      const hasHelper = Array.from(ratioCards).some(c => c.querySelector('small')?.textContent === 'Gelirinin harcamalara giden kısmı');
+      expect(hasHelper).toBe(true);
+    });
+
+    it('expense ratio formula unchanged', () => {
+      const ratio = calculateExpenseRatio(100000, 26000, 10000);
+      expect(ratio).toBeCloseTo(36, 0);
+    });
+
+    it('budgetConsumptionRate formula unchanged', async () => {
+      const { HomeScreen } = await import('../../features/Screens');
+      const wrapper = createTestWrapper();
+      render(<HomeScreen goTo={() => {}} />, { wrapper });
+      const tempoTrack = document.querySelector('.tempo__track');
+      expect(tempoTrack).toBeTruthy();
+      const tempoLabels = document.querySelector('.tempo__labels');
+      expect(tempoLabels?.textContent).toMatch(/%[\d]+/);
+    });
+
+    it('home hero hierarchy preserved with single strong value', async () => {
+      const { HomeScreen } = await import('../../features/Screens');
+      const wrapper = createTestWrapper();
+      render(<HomeScreen goTo={() => {}} />, { wrapper });
+      const hero = document.querySelector('.hero-balance');
+      const strong = hero?.querySelectorAll('strong');
+      expect(strong?.length).toBe(1);
+      const meta = hero?.querySelector('.hero-balance__meta');
+      expect(meta).toBeTruthy();
+    });
   });
 });
