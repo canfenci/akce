@@ -47,6 +47,7 @@ export type FinanceMutation =
   | { type: 'fixedExpense.delete'; monthKey: string; id: string }
   | { type: 'fixedExpense.toggle'; monthKey: string; id: string; active: boolean; updatedAt: number }
   | { type: 'investment.update'; value: Investment }
+  | { type: 'investment.create'; value: Investment }
   | { type: 'investment.toggle'; monthKey: string; id: string; completed: boolean; actualAmount: number; completedDate?: string; updatedAt: number }
   | { type: 'categoryBudget.create'; value: CategoryBudget }
   | { type: 'categoryBudget.update'; value: CategoryBudget }

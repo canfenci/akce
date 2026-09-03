@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Icon, type IconName } from './components/Icon';
 import { QuickExpenseSheet } from './components/QuickExpenseSheet';
+import { QuickAddSheet, type QuickAddAction } from './components/QuickAddSheet';
 import { AssetsScreen, BudgetScreen, CoachScreen, ExpensesScreen, HomeScreen, InvestmentsScreen, SettingsScreen } from './features/Screens';
 import { AkceStoreProvider, useAkceStore } from './store/AkceStore';
 import { useAuth } from './auth/AuthProvider';
@@ -24,14 +25,17 @@ function FinanceApp() {
   const { mode, user, signOut, leaveLocalMode } = useAuth();
   const [page, setPage] = useState<Page>('home');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
+  const [openFormSignal, setOpenFormSignal] = useState<QuickAddAction | null>(null);
+  const fabRef = useRef<HTMLButtonElement>(null);
   useEffect(() => { window.scrollTo({ top: 0 }); setMenuOpen(false); }, [page]);
   if (state.settings.showOnboarding) return <Onboarding />;
   const navigate = (next: string) => setPage(next as Page);
   const account = mode === 'local'
     ? { label: 'Yerel kullanım', detail: 'Veriler yalnızca bu cihazda', actionLabel: 'Giriş ekranına dön', onAction: leaveLocalMode }
     : { label: user?.displayName || 'Google hesabı', detail: user?.email || '', actionLabel: 'Çıkış yap', onAction: () => void signOut() };
-  const screen = page === 'home' ? <HomeScreen goTo={navigate} /> : page === 'expenses' ? <ExpensesScreen openQuick={() => setQuickOpen(true)} /> : page === 'budget' ? <BudgetScreen /> : page === 'investments' ? <InvestmentsScreen /> : page === 'assets' ? <AssetsScreen /> : page === 'coach' ? <CoachScreen /> : <SettingsScreen account={account} mode={mode} />;
+  const screen = page === 'home' ? <HomeScreen goTo={navigate} /> : page === 'expenses' ? <ExpensesScreen openQuick={() => setQuickOpen(true)} openFormSignal={openFormSignal} onFormSignalConsumed={() => setOpenFormSignal(null)} /> : page === 'budget' ? <BudgetScreen openFormSignal={openFormSignal} onFormSignalConsumed={() => setOpenFormSignal(null)} /> : page === 'investments' ? <InvestmentsScreen openFormSignal={openFormSignal} onFormSignalConsumed={() => setOpenFormSignal(null)} /> : page === 'assets' ? <AssetsScreen openFormSignal={openFormSignal} onFormSignalConsumed={() => setOpenFormSignal(null)} /> : page === 'coach' ? <CoachScreen /> : <SettingsScreen account={account} mode={mode} />;
 
   const syncFooter = mode === 'local'
     ? { title: 'Veriler cihazında', subtitle: 'Akçe V1 · Çevrimdışı hazır' }
@@ -54,11 +58,18 @@ function FinanceApp() {
     <nav className="bottom-nav">
       <button className={page === 'home' ? 'active' : ''} onClick={() => setPage('home')} style={{ gridColumn: 1 }}><Icon name="home"/><span>Ana Sayfa</span></button>
       <button className={page === 'budget' ? 'active' : ''} onClick={() => setPage('budget')} style={{ gridColumn: 2 }}><Icon name="wallet"/><span>Bütçe</span></button>
-      <button className="bottom-nav__add" onClick={() => setQuickOpen(true)} aria-label="Hızlı harcama ekle"><Icon name="plus"/></button>
+      <button className="bottom-nav__add" ref={fabRef} onClick={() => setQuickAddOpen(true)} aria-label="Hızlı ekle"><Icon name="plus"/></button>
       <button className={page === 'assets' ? 'active' : ''} onClick={() => setPage('assets')} style={{ gridColumn: 4 }}><Icon name="target"/><span>Varlıklar</span></button>
       <button className={page === 'settings' ? 'active' : ''} onClick={() => setPage('settings')} style={{ gridColumn: 5 }}><Icon name="settings"/><span>Ayarlar</span></button>
     </nav>
     {menuOpen && <div className="drawer-layer" onMouseDown={event => { if (event.target === event.currentTarget) setMenuOpen(false); }}><aside className="drawer"><header><div className="wordmark">akçe<span>.</span></div><button className="icon-button" onClick={() => setMenuOpen(false)} aria-label="Menüyü kapat"><Icon name="close"/></button></header><p>Az özellik. Çok disiplin.</p><nav>{navItems.slice(1).map(item => <button key={item.id} className={page === item.id ? 'active' : ''} onClick={() => setPage(item.id)}><Icon name={item.icon}/>{item.label}<Icon name="arrow"/></button>)}</nav></aside></div>}
+    <QuickAddSheet open={quickAddOpen} onClose={() => { setQuickAddOpen(false); fabRef.current?.focus(); }} onSelect={action => {
+      setQuickAddOpen(false);
+      if (action === 'expense') { setQuickOpen(true); return; }
+      const targetPage = action === 'income' ? 'budget' : action === 'investment' ? 'investments' : 'assets';
+      setPage(targetPage as Page);
+      setOpenFormSignal(action);
+    }} />
     <QuickExpenseSheet open={quickOpen} onClose={() => setQuickOpen(false)} />
   </div>;
 }

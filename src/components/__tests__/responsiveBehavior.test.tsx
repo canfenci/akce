@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { AkceStoreProvider } from '../../store/AkceStore';
 import { localStorageFinanceRepository } from '../../store/localStorageFinanceRepository';
 import { FinanceSyncCoordinator } from '../../store/financeSyncCoordinator';
@@ -211,5 +211,59 @@ describe('Symmetric mobile bottom navigation', () => {
     const settingsBtn = buttons.find(b => b.textContent === 'Ayarlar');
     expect(settingsBtn).toBeTruthy();
     document.body.removeChild(nav);
+  });
+});
+
+describe('QuickAddSheet', () => {
+  it('renders four actions in correct order', async () => {
+    const { QuickAddSheet } = await import('../../components/QuickAddSheet');
+    const wrapper = createTestWrapper();
+    render(<QuickAddSheet open={true} onClose={() => {}} onSelect={() => {}} />, { wrapper });
+    expect(screen.getByText('Harcama ekle')).toBeTruthy();
+    expect(screen.getByText('Gelir ekle')).toBeTruthy();
+    expect(screen.getByText('Yatırım ekle')).toBeTruthy();
+    expect(screen.getByText('Varlık ekle')).toBeTruthy();
+    const items = screen.getAllByRole('button', { name: /ekle$/ });
+    expect(items.length).toBe(4);
+    expect(items[0].textContent).toContain('Harcama ekle');
+    expect(items[1].textContent).toContain('Gelir ekle');
+    expect(items[2].textContent).toContain('Yatırım ekle');
+    expect(items[3].textContent).toContain('Varlık ekle');
+  });
+
+  it('renders helper subtitles', async () => {
+    const { QuickAddSheet } = await import('../../components/QuickAddSheet');
+    const wrapper = createTestWrapper();
+    render(<QuickAddSheet open={true} onClose={() => {}} onSelect={() => {}} />, { wrapper });
+    expect(screen.getByText('Günlük harcamanı kaydet')).toBeTruthy();
+    expect(screen.getByText('Yeni gelir ekle')).toBeTruthy();
+    expect(screen.getByText('Aylık yatırım gerçekleşmesini kaydet')).toBeTruthy();
+    expect(screen.getByText('Portföyüne yeni varlık ekle')).toBeTruthy();
+  });
+
+  it('calls onSelect with correct action when clicked', async () => {
+    const { QuickAddSheet } = await import('../../components/QuickAddSheet');
+    const onSelect = vi.fn();
+    const wrapper = createTestWrapper();
+    render(<QuickAddSheet open={true} onClose={() => {}} onSelect={onSelect} />, { wrapper });
+    fireEvent.click(screen.getByText('Harcama ekle'));
+    expect(onSelect).toHaveBeenCalledWith('expense');
+    fireEvent.click(screen.getByText('Varlık ekle'));
+    expect(onSelect).toHaveBeenCalledWith('asset');
+  });
+
+  it('returns null when not open', async () => {
+    const { QuickAddSheet } = await import('../../components/QuickAddSheet');
+    const wrapper = createTestWrapper();
+    const { container } = render(<QuickAddSheet open={false} onClose={() => {}} onSelect={() => {}} />, { wrapper });
+    expect(container.innerHTML).toBe('');
+  });
+
+  it('has accessible dialog', async () => {
+    const { QuickAddSheet } = await import('../../components/QuickAddSheet');
+    const wrapper = createTestWrapper();
+    render(<QuickAddSheet open={true} onClose={() => {}} onSelect={() => {}} />, { wrapper });
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    expect(screen.getByLabelText('Hızlı Ekle')).toBeTruthy();
   });
 });

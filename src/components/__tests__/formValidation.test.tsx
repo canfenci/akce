@@ -317,4 +317,28 @@ describe('Budget form validation', () => {
     expect(ASSET_GROUP_LABELS['Nakit']).toBe('Nakit');
     expect(ASSET_GROUP_LABELS['Kripto']).toBe('Kripto');
   });
+
+  it('reducer handles ADD_INVESTMENT action', () => {
+    const state = seedData;
+    const newInvestment = { id: 'inv-new', group: 'TEFAS' as const, plannedAmount: 5000, actualAmount: 0, completed: false, monthKey: '2026-09', createdAt: Date.now(), updatedAt: Date.now(), userId: 'local-user' };
+    const next = reducer(state, { type: 'ADD_INVESTMENT', payload: newInvestment });
+    expect(next.investments.some(i => i.id === 'inv-new')).toBe(true);
+    expect(next.investments.find(i => i.id === 'inv-new')?.plannedAmount).toBe(5000);
+  });
+
+  it('investment create maps to investment.create Firestore mutation', async () => {
+    const { mapActionToMutation } = await import('../../store/AkceStore');
+    const investment = { id: 'inv-1', group: 'Altın' as const, plannedAmount: 3000, actualAmount: 0, completed: false, monthKey: '2026-09', createdAt: 1, updatedAt: 1, userId: 'u' };
+    const mutation = mapActionToMutation({ type: 'ADD_INVESTMENT', payload: investment }, seedData);
+    expect(mutation).toEqual({ type: 'investment.create', value: investment });
+  });
+
+  it('ADD_INVESTMENT prepends to investments array', () => {
+    const state = seedData;
+    const beforeLength = state.investments.length;
+    const newInv = { id: 'inv-first', group: 'BES' as const, plannedAmount: 1000, actualAmount: 0, completed: false, monthKey: '2026-09', createdAt: 1, updatedAt: 1, userId: 'u' };
+    const next = reducer(state, { type: 'ADD_INVESTMENT', payload: newInv });
+    expect(next.investments.length).toBe(beforeLength + 1);
+    expect(next.investments[0].id).toBe('inv-first');
+  });
 });

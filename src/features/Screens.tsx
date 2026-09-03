@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { coachProvider } from '../domain/coachEngine';
 import { calculateMonthSummary, formatCurrency, formatPercentage, getAssetProgress, getMonthKey, getTotalAssets, getTotalAssetTargets } from '../domain/financeEngine';
 import { formatMonthKey, getMonthCalculationDate, shiftMonthKey } from '../domain/month';
-import type { Asset, AssetGroup, Income, FixedExpense, CategoryBudget } from '../domain/types';
+import type { Asset, AssetGroup, Income, FixedExpense, CategoryBudget, Investment } from '../domain/types';
 import { ASSET_GROUPS, ASSET_GROUP_LABELS } from '../domain/types';
 import { useAkceStore } from '../store/AkceStore';
 import { getIsDeviceTrusted, setIsDeviceTrusted } from '../store/devicePreference';
@@ -89,7 +89,7 @@ export function HomeScreen({ goTo }: { goTo: (page: string) => void }) {
   </div>;
 }
 
-export function ExpensesScreen({ openQuick }: { openQuick: () => void }) {
+export function ExpensesScreen({ openQuick, openFormSignal: _openFormSignal, onFormSignalConsumed: _onFormSignalConsumed }: { openQuick: () => void; openFormSignal?: string | null; onFormSignalConsumed?: () => void }) {
   const { state, dispatch } = useAkceStore();
   const summary = useSummary();
   const [filter, setFilter] = useState('Tümü');
@@ -104,7 +104,7 @@ export function ExpensesScreen({ openQuick }: { openQuick: () => void }) {
 }
 
 type BudgetTab = 'Genel Bakış' | 'Gelirler' | 'Otomatik Giderler' | 'Kategoriler';
-export function BudgetScreen({ initialTab = 'Genel Bakış' }: { initialTab?: BudgetTab }) {
+export function BudgetScreen({ initialTab = 'Genel Bakış', openFormSignal, onFormSignalConsumed }: { initialTab?: BudgetTab; openFormSignal?: string | null; onFormSignalConsumed?: () => void }) {
   const { state, dispatch } = useAkceStore(); const summary = useSummary(); const [tab, setTab] = useState<BudgetTab>(initialTab);
   const tabs: BudgetTab[] = ['Genel Bakış', 'Gelirler', 'Otomatik Giderler', 'Kategoriler'];
   const monthIncomes = state.incomes.filter(item => item.monthKey === state.selectedMonthKey);
@@ -145,6 +145,13 @@ export function BudgetScreen({ initialTab = 'Genel Bakış' }: { initialTab?: Bu
     setIncomeName(''); setIncomeAmount(''); setIncomeRecurring(true); setIncomeError('');
     setIncomeForm({ isOpen: true, mode: 'add' });
   };
+
+  useEffect(() => {
+    if (openFormSignal === 'income') {
+      openAddIncome();
+      onFormSignalConsumed?.();
+    }
+  }, [openFormSignal]);
 
   const openEditIncome = (income: Income) => {
     setIncomeName(income.name);
@@ -288,10 +295,59 @@ export function BudgetScreen({ initialTab = 'Genel Bakış' }: { initialTab?: Bu
   </div>
   );
 }
-export function InvestmentsScreen() {
+const INVESTMENT_GROUPS = ['TEFAS', 'Nasdaq', 'Altın', 'Gümüş', 'BES'] as const;
+const INVESTMENT_GROUP_LABELS: Record<string, string> = { TEFAS: 'TEFAS', Nasdaq: 'ABD / Nasdaq', Altın: 'Altın', Gümüş: 'Gümüş', BES: 'Bireysel Emeklilik' };
+
+export function InvestmentsScreen({ openFormSignal, onFormSignalConsumed }: { openFormSignal?: string | null; onFormSignalConsumed?: () => void }) {
   const { state, dispatch } = useAkceStore(); const summary = useSummary();
   const monthInvestments = state.investments.filter(item => item.monthKey === state.selectedMonthKey);
-  return <div className="screen"><PageHeader eyebrow="GELECEĞE AYRILAN" title="Yatırımlar" description="Önce geleceğini finanse et, sonra bugünü harca." /><MonthNavigation /><div className="protect-banner"><Icon name="target"/><div><b>Yatırım bütçen koruma altında</b><p>{formatCurrency(summary.totalFixedInvestment)} harcanabilir bütçeye dahil edilmedi.</p></div><strong>%{Math.round(summary.investmentPlanRealizationRate)}</strong></div><section className="investment-grid">{monthInvestments.map(item => <article className={`investment-card ${item.completed ? 'completed' : ''}`} key={item.id}><span className="asset-monogram">{item.group.slice(0, 2).toLocaleUpperCase('tr-TR')}</span><div className="investment-card__details"><div><span>{item.group}</span><h3>{formatCurrency(item.plannedAmount)}</h3><small>Aylık plan</small></div>{item.actualAmount > 0 && <span className="investment-card__actual">Gerçekleşen: <b>{formatCurrency(item.actualAmount)}</b></span>}</div><button onClick={() => dispatch({ type: 'TOGGLE_INVESTMENT', id: item.id })}><span>{item.completed && <Icon name="check"/>}</span>{item.completed ? 'Tamamlandı' : 'Tamamla'}</button></article>)}</section></div>;
+
+  const [investForm, setInvestForm] = useState<{ isOpen: boolean; mode: 'add' | 'edit' }>({ isOpen: false, mode: 'add' });
+  const [investGroup, setInvestGroup] = useState<string>('TEFAS');
+  const [investPlanned, setInvestPlanned] = useState('');
+  const [investActual, setInvestActual] = useState('');
+  const [investError, setInvestError] = useState('');
+
+  const investSheetRef = useDialogSheet(investForm.isOpen, () => setInvestForm({ isOpen: false, mode: 'add' }));
+  const viewportHeight = useVisualViewportHeight();
+  const sheetMaxHeight = viewportHeight > 0 ? `${Math.floor(viewportHeight * 0.94)}px` : '94vh';
+
+  const openAddInvestment = () => {
+    setInvestGroup('TEFAS'); setInvestPlanned(''); setInvestActual(''); setInvestError('');
+    setInvestForm({ isOpen: true, mode: 'add' });
+  };
+
+  const saveInvestment = () => {
+    const planned = Number(investPlanned);
+    const actual = Number(investActual) || 0;
+    if (!Number.isFinite(planned) || planned <= 0) { setInvestError('Planlanan tutar 0\'dan büyük olmalı.'); return; }
+    if (!Number.isFinite(actual) || actual < 0) { setInvestError('Gerçekleşen tutar 0 veya daha büyük olmalı.'); return; }
+    const now = Date.now();
+    dispatch({ type: 'ADD_INVESTMENT', payload: { id: crypto.randomUUID(), group: investGroup as Investment['group'], plannedAmount: planned, actualAmount: actual, completed: false, monthKey: state.selectedMonthKey, createdAt: now, updatedAt: now, userId: 'local-user' } });
+    setInvestForm({ isOpen: false, mode: 'add' });
+  };
+
+  useEffect(() => {
+    if (openFormSignal === 'investment') {
+      openAddInvestment();
+      onFormSignalConsumed?.();
+    }
+  }, [openFormSignal]);
+
+  return <div className="screen"><PageHeader eyebrow="GELECEĞE AYRILAN" title="Yatırımlar" description="Önce geleceğini finanse et, sonra bugünü harca." /><MonthNavigation /><div className="protect-banner"><Icon name="target"/><div><b>Yatırım bütçen koruma altında</b><p>{formatCurrency(summary.totalFixedInvestment)} harcanabilir bütçeye dahil edilmedi.</p></div><strong>%{Math.round(summary.investmentPlanRealizationRate)}</strong></div><button className="add-inline" onClick={openAddInvestment}><Icon name="plus" /> Yeni yatırım planı</button><section className="investment-grid">{monthInvestments.map(item => <article className={`investment-card ${item.completed ? 'completed' : ''}`} key={item.id}><span className="asset-monogram">{item.group.slice(0, 2).toLocaleUpperCase('tr-TR')}</span><div className="investment-card__details"><div><span>{item.group}</span><h3>{formatCurrency(item.plannedAmount)}</h3><small>Aylık plan</small></div>{item.actualAmount > 0 && <span className="investment-card__actual">Gerçekleşen: <b>{formatCurrency(item.actualAmount)}</b></span>}</div><button onClick={() => dispatch({ type: 'TOGGLE_INVESTMENT', id: item.id })}><span>{item.completed && <Icon name="check"/>}</span>{item.completed ? 'Tamamlandı' : 'Tamamla'}</button></article>)}</section>
+
+    {investForm.isOpen && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setInvestForm({ isOpen: false, mode: 'add' }); }}>
+      <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="invest-title" ref={investSheetRef} style={{ maxHeight: sheetMaxHeight }}>
+        <div className="sheet__handle" />
+        <header className="sheet__header"><div><span className="eyebrow">YATIRIM</span><h2 id="invest-title">Yeni yatırım planı</h2></div><button className="icon-button" onClick={() => setInvestForm({ isOpen: false, mode: 'add' })} aria-label="Kapat"><Icon name="close" /></button></header>
+        <label className="field">Tür<select value={investGroup} onChange={e => setInvestGroup(e.target.value)}>{INVESTMENT_GROUPS.map(g => <option key={g} value={g}>{INVESTMENT_GROUP_LABELS[g]}</option>)}</select></label>
+        <label className="amount-input"><span>Planlanan tutar</span><div><input autoFocus inputMode="decimal" value={investPlanned} onChange={e => { setInvestPlanned(e.target.value.replace(/[^0-9.]/g, '')); setInvestError(''); }} placeholder="0" aria-label="Planlanan tutar" /><b>TL</b></div></label>
+        <label className="amount-input"><span>Gerçekleşen tutar</span><div><input inputMode="decimal" value={investActual} onChange={e => { setInvestActual(e.target.value.replace(/[^0-9.]/g, '')); setInvestError(''); }} placeholder="0" aria-label="Gerçekleşen tutar" /><b>TL</b></div></label>
+        {investError && <p className="form-error">{investError}</p>}
+        <button className="primary-button" onClick={saveInvestment}>Yatırımı kaydet</button>
+      </section>
+    </div>}
+  </div>;
 }
 
 type AssetFormMode = 'add' | 'edit';
@@ -301,7 +357,7 @@ interface AssetFormState {
   currentAsset?: Asset;
 }
 
-export function AssetsScreen() {
+export function AssetsScreen({ openFormSignal, onFormSignalConsumed }: { openFormSignal?: string | null; onFormSignalConsumed?: () => void }) {
   const { state, dispatch } = useAkceStore();
   const total = getTotalAssets(state.assets);
   const target = getTotalAssetTargets(state.assets);
@@ -327,6 +383,13 @@ export function AssetsScreen() {
     setAssetGroup('TEFAS'); setCurrentAmount(''); setTargetAmount(''); setFormError('');
     setAssetForm({ isOpen: true, mode: 'add' });
   };
+
+  useEffect(() => {
+    if (openFormSignal === 'asset') {
+      openAddAsset();
+      onFormSignalConsumed?.();
+    }
+  }, [openFormSignal]);
 
   const openEditAsset = (asset: Asset) => {
     setAssetGroup(asset.group);
