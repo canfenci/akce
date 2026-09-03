@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { FirebaseConfigError } from '../firebase/firebaseConfig';
-import { createFirebaseAuthClient, shouldUseRedirect, type AuthClient, type AuthUser } from './firebaseAuthClient';
+import { createFirebaseAuthClient, type AuthClient, type AuthUser } from './firebaseAuthClient';
 
 export type AuthStatus = 'loading' | 'signedOut' | 'signedIn' | 'error';
 export type AuthMode = 'firebase' | 'local';
@@ -94,12 +94,7 @@ export function AuthProvider({
     }
     setError(null);
     try {
-      if (shouldUseRedirect()) {
-        setStatus('loading');
-        await activeClient.signInWithRedirect();
-      } else {
-        await activeClient.signInWithPopup();
-      }
+      await activeClient.signInWithPopup();
     } catch (authError) {
       setError(getAuthErrorMessage(authError));
       setStatus('error');

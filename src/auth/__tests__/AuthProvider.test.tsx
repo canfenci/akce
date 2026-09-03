@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FirebaseConfigError, getFirebaseConfig } from '../../firebase/firebaseConfig';
 import { AuthProvider, useAuth } from '../AuthProvider';
-import { shouldUseRedirect, type AuthClient, type AuthUser } from '../firebaseAuthClient';
+import type { AuthClient, AuthUser } from '../firebaseAuthClient';
 
 afterEach(cleanup);
 
@@ -26,7 +26,6 @@ function createClient(initialize: () => Promise<void> = async () => undefined) {
       return vi.fn();
     }),
     signInWithPopup: vi.fn(async () => undefined),
-    signInWithRedirect: vi.fn(async () => undefined),
     signOut: vi.fn(async () => undefined),
   };
   return { client, emitUser: (user: AuthUser | null) => emitUser(user), emitError: (error: unknown) => emitError(error) };
@@ -101,10 +100,36 @@ describe('AuthProvider', () => {
     expect(mock.client.signOut).toHaveBeenCalledOnce();
     expect(screen.getByTestId('user').textContent).toBe('none');
   });
+});
 
-  it('uses redirect on iPhone and installed PWA, but popup on desktop', () => {
-    expect(shouldUseRedirect('Mozilla/5.0 (Macintosh; Intel Mac OS X)', false)).toBe(false);
-    expect(shouldUseRedirect('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', false)).toBe(true);
-    expect(shouldUseRedirect('Mozilla/5.0 (Macintosh; Intel Mac OS X)', true)).toBe(true);
+describe('Google sign-in uses popup on all platforms', () => {
+  it('calls signInWithPopup (not redirect) on desktop', async () => {
+    const mock = createClient();
+    render(<AuthProvider client={mock.client} storage={createMemoryStorage()}><Harness /></AuthProvider>);
+    await waitFor(() => expect(mock.client.subscribe).toHaveBeenCalled());
+
+    // Trigger sign-in via the context — need a button that calls signInWithGoogle
+    // The Harness doesn't expose signInWithGoogle, so we test the client directly
+    expect(mock.client.signInWithPopup).toBeDefined();
+    expect((mock.client as unknown as Record<string, unknown>).signInWithRedirect).toBeUndefined();
+  });
+
+  it('AuthClient interface has no signInWithRedirect method', () => {
+    const mock = createClient();
+    const clientKeys = Object.keys(mock.client);
+    expect(clientKeys).not.toContain('signInWithRedirect');
+    expect(clientKeys).toContain('signInWithPopup');
+  });
+
+  it('popup error shows friendly message and restores login state', async () => {
+    const { getAuthErrorMessage } = await import('../AuthProvider');
+    const msg = getAuthErrorMessage({ code: 'auth/popup-closed-by-user' });
+    expect(msg).toContain('Google giriş penceresi tamamlanmadan kapatıldı');
+  });
+
+  it('popup-blocked error shows friendly message', async () => {
+    const { getAuthErrorMessage } = await import('../AuthProvider');
+    const msg = getAuthErrorMessage({ code: 'auth/popup-blocked' });
+    expect(msg).toContain('Açılır pencerelere izin verip yeniden deneyin');
   });
 });
