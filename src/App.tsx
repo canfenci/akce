@@ -6,6 +6,7 @@ import { AssetsScreen, BudgetScreen, CoachScreen, ExpensesScreen, HomeScreen, In
 import { AkceStoreProvider, useAkceStore } from './store/AkceStore';
 import { useAuth } from './auth/AuthProvider';
 import { AuthLoadingScreen, SignedOutScreen } from './auth/AuthScreens';
+import type { Expense } from './domain/types';
 
 type Page = 'home' | 'expenses' | 'budget' | 'investments' | 'assets' | 'coach' | 'settings';
 const navItems: { id: Page; label: string; icon: IconName }[] = [
@@ -29,6 +30,9 @@ function FinanceApp() {
   const [quickOpen, setQuickOpen] = useState(false);
   const [openFormSignal, setOpenFormSignal] = useState<QuickAddAction | null>(null);
   const fabRef = useRef<HTMLButtonElement>(null);
+  const lastExpenseCategory = useRef('Market');
+  const lastExpenseType = useRef<Expense['type']>('zorunlu');
+  const lastExpensePaymentMethod = useRef<Expense['paymentMethod']>('kart');
   useEffect(() => { window.scrollTo({ top: 0 }); setMenuOpen(false); }, [page]);
   if (state.settings.showOnboarding) return <Onboarding />;
   const navigate = (next: string) => setPage(next as Page);
@@ -70,7 +74,15 @@ function FinanceApp() {
       setPage(targetPage as Page);
       setOpenFormSignal(action);
     }} />
-    <QuickExpenseSheet open={quickOpen} onClose={() => setQuickOpen(false)} />
+    <QuickExpenseSheet open={quickOpen} onClose={() => setQuickOpen(false)}
+      initialCategory={lastExpenseCategory.current}
+      initialType={lastExpenseType.current}
+      initialPaymentMethod={lastExpensePaymentMethod.current}
+      onSave={(category, type, paymentMethod) => {
+        lastExpenseCategory.current = category;
+        lastExpenseType.current = type;
+        lastExpensePaymentMethod.current = paymentMethod;
+      }} />
   </div>;
 }
 

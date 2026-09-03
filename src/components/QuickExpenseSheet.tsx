@@ -7,12 +7,19 @@ import { Icon } from './Icon';
 import { useDialogSheet } from '../hooks/useDialogSheet';
 import { useVisualViewportHeight } from '../hooks/useVisualViewportHeight';
 
-export function QuickExpenseSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function QuickExpenseSheet({ open, onClose, initialCategory = 'Market', initialType = 'zorunlu', initialPaymentMethod = 'kart', onSave }: {
+  open: boolean;
+  onClose: () => void;
+  initialCategory?: string;
+  initialType?: Expense['type'];
+  initialPaymentMethod?: Expense['paymentMethod'];
+  onSave?: (category: string, type: Expense['type'], paymentMethod: Expense['paymentMethod']) => void;
+}) {
   const { state, dispatch } = useAkceStore();
   const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState('Market');
-  const [expenseType, setExpenseType] = useState<Expense['type']>('zorunlu');
-  const [paymentMethod, setPaymentMethod] = useState<Expense['paymentMethod']>('kart');
+  const [category, setCategory] = useState(initialCategory);
+  const [expenseType, setExpenseType] = useState<Expense['type']>(initialType);
+  const [paymentMethod, setPaymentMethod] = useState<Expense['paymentMethod']>(initialPaymentMethod);
   const [note, setNote] = useState('');
   const [formError, setFormError] = useState('');
   const summary = useMemo(() => calculateMonthSummary(state.incomes, state.fixedExpenses, state.investments, state.expenses, state.assets, getMonthCalculationDate(state.selectedMonthKey)), [state]);
@@ -24,6 +31,10 @@ export function QuickExpenseSheet({ open, onClose }: { open: boolean; onClose: (
   const monthCategories = state.categoryBudgets.filter(item => item.monthKey === state.selectedMonthKey);
   const hasCategories = monthCategories.length > 0;
 
+  const validCategory = hasCategories && !monthCategories.some(c => c.name === category)
+    ? monthCategories[0]?.name ?? 'Market'
+    : category;
+
   const sheetRef = useDialogSheet(open, onClose);
   const viewportHeight = useVisualViewportHeight();
   const sheetMaxHeight = viewportHeight > 0 ? `${Math.floor(viewportHeight * 0.94)}px` : '94vh';
@@ -33,8 +44,9 @@ export function QuickExpenseSheet({ open, onClose }: { open: boolean; onClose: (
     if (!hasCategories) { setFormError('Henüz kategori yok. Bütçeden kategori ekleyin.'); return; }
     const now = new Date();
     const date = state.selectedMonthKey === getMonthKey(now) ? now.toISOString().slice(0, 10) : `${state.selectedMonthKey}-01`;
-    dispatch({ type: 'ADD_EXPENSE', payload: { id: crypto.randomUUID(), amount: numericAmount, category, type: expenseType, paymentMethod, note: note.trim() || undefined, date, monthKey: state.selectedMonthKey, createdAt: now.getTime(), updatedAt: now.getTime(), userId: 'local-user' } });
-    setAmount(''); setNote(''); setExpenseType('zorunlu'); setFormError(''); onClose();
+    dispatch({ type: 'ADD_EXPENSE', payload: { id: crypto.randomUUID(), amount: numericAmount, category: validCategory, type: expenseType, paymentMethod, note: note.trim() || undefined, date, monthKey: state.selectedMonthKey, createdAt: now.getTime(), updatedAt: now.getTime(), userId: 'local-user' } });
+    onSave?.(validCategory, expenseType, paymentMethod);
+    setAmount(''); setNote(''); setFormError(''); onClose();
   };
 
   if (!open) return null;
@@ -46,7 +58,7 @@ export function QuickExpenseSheet({ open, onClose }: { open: boolean; onClose: (
       <label className="amount-input"><span>Tutar</span><div><input autoFocus inputMode="decimal" value={amount} onChange={event => { setAmount(event.target.value.replace(/[^0-9.]/g, '')); setFormError(''); }} placeholder="0" aria-label="Harcama tutarı"/><b>TL</b></div></label>
       <div className="quick-amounts">{[100, 250, 500, 1000].map(value => <button key={value} type="button" onClick={() => setAmount(String(numericAmount + value))}>+{value}</button>)}</div>
       {hasCategories
-        ? <div className="form-grid"><label>Kategori<select value={category} onChange={e => { setCategory(e.target.value); setFormError(''); }}>{monthCategories.map(item => <option key={item.id}>{item.name}</option>)}</select></label><label>Ödeme<select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as Expense['paymentMethod'])}><option value="kart">Kart</option><option value="nakit">Nakit</option></select></label></div>
+        ? <div className="form-grid"><label>Kategori<select aria-label="Kategori" value={validCategory} onChange={e => { setCategory(e.target.value); setFormError(''); }}>{monthCategories.map(item => <option key={item.id}>{item.name}</option>)}</select></label><label>Ödeme<select aria-label="Ödeme" value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as Expense['paymentMethod'])}><option value="kart">Kart</option><option value="nakit">Nakit</option></select></label></div>
         : <div className="form-error">Henüz kategori yok. Bütçeden kategori ekleyin.</div>}
       <fieldset className="segmented"><legend>Harcama türü</legend>{(['zorunlu', 'isteğe bağlı', 'plansız'] as const).map(value => <button type="button" key={value} className={expenseType === value ? 'active' : ''} onClick={() => setExpenseType(value)}>{value}</button>)}</fieldset>
       <label className="field">Not <input value={note} onChange={e => setNote(e.target.value)} placeholder="İstersen kısa bir not ekle" /></label>

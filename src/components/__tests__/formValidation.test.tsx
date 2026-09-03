@@ -342,3 +342,88 @@ describe('Budget form validation', () => {
     expect(next.investments[0].id).toBe('inv-first');
   });
 });
+
+describe('QuickExpenseSheet expense memory', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('fresh session uses default category, type, and payment method', () => {
+    const wrapper = createTestWrapper();
+    render(<QuickExpenseSheet open={true} onClose={() => {}} />, { wrapper });
+    const categorySelect = screen.getByRole('combobox', { name: 'Kategori' }) as HTMLSelectElement;
+    expect(categorySelect.value).toBe('Market');
+    const typeButtons = screen.getAllByRole('button', { name: /zorunlu|isteğe bağlı|plansız/ });
+    const activeType = typeButtons.find(b => b.classList.contains('active'));
+    expect(activeType?.textContent).toBe('zorunlu');
+    const paymentSelect = screen.getByRole('combobox', { name: 'Ödeme' }) as HTMLSelectElement;
+    expect(paymentSelect.value).toBe('kart');
+  });
+
+  it('initialCategory prop overrides default', () => {
+    const wrapper = createTestWrapper();
+    render(<QuickExpenseSheet open={true} onClose={() => {}} initialCategory="Ulaşım" initialType="isteğe bağlı" initialPaymentMethod="nakit" />, { wrapper });
+    const categorySelect = screen.getByRole('combobox', { name: 'Kategori' }) as HTMLSelectElement;
+    expect(categorySelect.value).toBe('Ulaşım');
+    const typeButtons = screen.getAllByRole('button', { name: /zorunlu|isteğe bağlı|plansız/ });
+    const activeType = typeButtons.find(b => b.classList.contains('active'));
+    expect(activeType?.textContent).toBe('isteğe bağlı');
+    const paymentSelect = screen.getByRole('combobox', { name: 'Ödeme' }) as HTMLSelectElement;
+    expect(paymentSelect.value).toBe('nakit');
+  });
+
+  it('onSave is called with current selections on save', () => {
+    const onSave = vi.fn();
+    const wrapper = createTestWrapper();
+    render(<QuickExpenseSheet open={true} onClose={() => {}} initialCategory="Market" initialType="zorunlu" initialPaymentMethod="kart" onSave={onSave} />, { wrapper });
+    const input = screen.getByLabelText('Harcama tutarı') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '100' } });
+    fireEvent.click(screen.getByText('Harcamayı kaydet'));
+    expect(onSave).toHaveBeenCalledWith('Market', 'zorunlu', 'kart');
+  });
+
+  it('onSave reflects user-changed selections', () => {
+    const onSave = vi.fn();
+    const wrapper = createTestWrapper();
+    render(<QuickExpenseSheet open={true} onClose={() => {}} onSave={onSave} />, { wrapper });
+    const input = screen.getByLabelText('Harcama tutarı') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '250' } });
+    const paymentSelect = screen.getByRole('combobox', { name: 'Ödeme' }) as HTMLSelectElement;
+    fireEvent.change(paymentSelect, { target: { value: 'nakit' } });
+    fireEvent.click(screen.getByText('Harcamayı kaydet'));
+    expect(onSave).toHaveBeenCalledWith('Market', 'zorunlu', 'nakit');
+  });
+
+  it('amount resets after save', () => {
+    const wrapper = createTestWrapper();
+    render(<QuickExpenseSheet open={true} onClose={() => {}} />, { wrapper });
+    const input = screen.getByLabelText('Harcama tutarı') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '500' } });
+    fireEvent.click(screen.getByText('Harcamayı kaydet'));
+    expect(input.value).toBe('');
+  });
+
+  it('invalid category falls back to first valid category', () => {
+    const wrapper = createTestWrapper();
+    render(<QuickExpenseSheet open={true} onClose={() => {}} initialCategory="NonExistentCategory" />, { wrapper });
+    const categorySelect = screen.getByRole('combobox', { name: 'Kategori' }) as HTMLSelectElement;
+    expect(categorySelect.value).not.toBe('NonExistentCategory');
+    expect(categorySelect.value.length).toBeGreaterThan(0);
+  });
+
+  it('expense creation mutation is unchanged', async () => {
+    const { mapActionToMutation } = await import('../../store/AkceStore');
+    const expense = { id: 'exp-1', amount: 100, category: 'Market', type: 'zorunlu' as const, paymentMethod: 'kart' as const, date: '2026-09-01', monthKey: '2026-09', createdAt: 1, updatedAt: 1, userId: 'u' };
+    const mutation = mapActionToMutation({ type: 'ADD_EXPENSE', payload: expense }, seedData);
+    expect(mutation).toEqual({ type: 'expense.create', value: expense });
+  });
+
+  it('does not remember amount across opens', () => {
+    const wrapper = createTestWrapper();
+    const { unmount } = render(<QuickExpenseSheet open={true} onClose={() => {}} />, { wrapper });
+    const input = screen.getByLabelText('Harcama tutarı') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '999' } });
+    unmount();
+    const { container } = render(<QuickExpenseSheet open={true} onClose={() => {}} />, { wrapper });
+    const newInput = container.querySelector('input[aria-label="Harcama tutarı"]') as HTMLInputElement;
+    expect(newInput.value).toBe('');
+  });
+});
