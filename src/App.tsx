@@ -64,7 +64,7 @@ function FinanceApp() {
       <button className={page === 'budget' ? 'active' : ''} onClick={() => setPage('budget')} style={{ gridColumn: 2 }}><Icon name="wallet"/><span>Bütçe</span></button>
       <button className="bottom-nav__add" ref={fabRef} onClick={() => setQuickAddOpen(true)} aria-label="Hızlı ekle"><Icon name="plus"/></button>
       <button className={page === 'assets' ? 'active' : ''} onClick={() => setPage('assets')} style={{ gridColumn: 4 }}><Icon name="target"/><span>Varlıklar</span></button>
-      <button className={page === 'settings' ? 'active' : ''} onClick={() => setPage('settings')} style={{ gridColumn: 5 }}><Icon name="settings"/><span>Ayarlar</span></button>
+      <button className={page === 'investments' ? 'active' : ''} onClick={() => setPage('investments')} style={{ gridColumn: 5 }}><Icon name="chart"/><span>Yatırımlar</span></button>
     </nav>
     {menuOpen && <div className="drawer-layer" onMouseDown={event => { if (event.target === event.currentTarget) setMenuOpen(false); }}><aside className="drawer"><header><div className="wordmark">akçe<span>.</span></div><button className="icon-button" onClick={() => setMenuOpen(false)} aria-label="Menüyü kapat"><Icon name="close"/></button></header><p>Az özellik. Çok disiplin.</p><nav>{navItems.slice(1).map(item => <button key={item.id} className={page === item.id ? 'active' : ''} onClick={() => setPage(item.id)}><Icon name={item.icon}/>{item.label}<Icon name="arrow"/></button>)}</nav></aside></div>}
     <QuickAddSheet open={quickAddOpen} onClose={() => { setQuickAddOpen(false); fabRef.current?.focus(); }} onSelect={action => {

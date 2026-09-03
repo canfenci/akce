@@ -144,7 +144,7 @@ describe('Symmetric mobile bottom navigation', () => {
   it('has 5 children: 4 tab buttons + 1 FAB', () => {
     const nav = document.createElement('nav');
     nav.className = 'bottom-nav';
-    const labels = ['Ana Sayfa', 'Bütçe', '', 'Varlıklar', 'Ayarlar'];
+    const labels = ['Ana Sayfa', 'Bütçe', '', 'Varlıklar', 'Yatırımlar'];
     for (const label of labels) {
       const btn = document.createElement('button');
       if (!label) btn.className = 'bottom-nav__add';
@@ -158,10 +158,10 @@ describe('Symmetric mobile bottom navigation', () => {
     document.body.removeChild(nav);
   });
 
-  it('nav items are in symmetric order: Ana Sayfa, Bütçe, +, Varlıklar, Ayarlar', () => {
+  it('nav items are in symmetric order: Ana Sayfa, Bütçe, +, Varlıklar, Yatırımlar', () => {
     const nav = document.createElement('nav');
     nav.className = 'bottom-nav';
-    const expected = ['Ana Sayfa', 'Bütçe', '', 'Varlıklar', 'Ayarlar'];
+    const expected = ['Ana Sayfa', 'Bütçe', '', 'Varlıklar', 'Yatırımlar'];
     for (const label of expected) {
       const btn = document.createElement('button');
       if (!label) btn.className = 'bottom-nav__add';
@@ -175,7 +175,7 @@ describe('Symmetric mobile bottom navigation', () => {
     expect(buttons[1].textContent).toBe('Bütçe');
     expect(buttons[2].className).toBe('bottom-nav__add');
     expect(buttons[3].textContent).toBe('Varlıklar');
-    expect(buttons[4].textContent).toBe('Ayarlar');
+    expect(buttons[4].textContent).toBe('Yatırımlar');
     document.body.removeChild(nav);
   });
 
@@ -196,10 +196,10 @@ describe('Symmetric mobile bottom navigation', () => {
     document.head.removeChild(style);
   });
 
-  it('Settings is visible in mobile bottom nav', () => {
+  it('Investments is visible in mobile bottom nav', () => {
     const nav = document.createElement('nav');
     nav.className = 'bottom-nav';
-    for (const label of ['Ana Sayfa', 'Bütçe', '', 'Varlıklar', 'Ayarlar']) {
+    for (const label of ['Ana Sayfa', 'Bütçe', '', 'Varlıklar', 'Yatırımlar']) {
       const btn = document.createElement('button');
       if (!label) btn.className = 'bottom-nav__add';
       else btn.textContent = label;
@@ -208,8 +208,8 @@ describe('Symmetric mobile bottom navigation', () => {
     document.body.appendChild(nav);
 
     const buttons = Array.from(nav.querySelectorAll('button'));
-    const settingsBtn = buttons.find(b => b.textContent === 'Ayarlar');
-    expect(settingsBtn).toBeTruthy();
+    const investmentsBtn = buttons.find(b => b.textContent === 'Yatırımlar');
+    expect(investmentsBtn).toBeTruthy();
     document.body.removeChild(nav);
   });
 });
