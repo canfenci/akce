@@ -220,12 +220,16 @@ export class FinanceSyncCoordinator {
     let existingMarker: MigrationMarker | null = null;
     try {
       existingMarker = await readMigrationMarker(this.gateway, uid);
-    } catch {
-      // Offline or network error reading marker
+    } catch (error) {
+      // Preserve the real Firebase failure. Treat it as offline only when the
+      // browser also reports that connectivity is unavailable.
       if (!this.isOnlineCheck()) {
         this.setStatus('offline');
         return;
       }
+      this.setStatus('error');
+      this.onErrorCallback?.(error instanceof Error ? error : new Error(String(error)));
+      return;
     }
 
     if (this.aborted || this.currentUid !== uid) return;

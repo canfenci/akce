@@ -70,3 +70,25 @@ export class FinanceRepositoryError extends Error {
     this.name = 'FinanceRepositoryError';
   }
 }
+
+export interface FirebaseErrorDetails {
+  code?: string;
+  message: string;
+}
+
+export function getFirebaseErrorDetails(error: unknown): FirebaseErrorDetails {
+  const original = error instanceof FinanceRepositoryError && error.originalError
+    ? error.originalError
+    : error;
+  const code = typeof original === 'object' && original && 'code' in original
+    ? String(original.code)
+    : undefined;
+  const message = original instanceof Error
+    ? original.message
+    : typeof original === 'object' && original && 'message' in original
+      ? String(original.message)
+      : error instanceof Error
+        ? error.message
+        : String(error);
+  return { code, message };
+}

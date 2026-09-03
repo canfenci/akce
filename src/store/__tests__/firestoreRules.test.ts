@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { seedData } from '../seed';
+import { toFirestoreDto } from '../firestoreFinanceMappers';
 
 // Rule simulation engine matching the logic of firestore.rules
 interface RuleAuth {
@@ -17,7 +19,7 @@ interface RuleRequest {
 interface EvaluationContext {
   request: RuleRequest;
   path: string;
-  operation: 'read' | 'create' | 'update' | 'delete';
+  operation: 'read' | 'list' | 'create' | 'update' | 'delete';
 }
 
 function evaluateRules(context: EvaluationContext): { allowed: boolean; reason?: string } {
@@ -76,6 +78,7 @@ function evaluateRules(context: EvaluationContext): { allowed: boolean; reason?:
   if (parts[2] === 'assetSnapshots') {
     if (operation === 'read' || operation === 'delete') return { allowed: true };
     const data = request.resource?.data ?? {};
+    if (data.schemaVersion !== 2) return { allowed: false, reason: 'invalid-schema-version' };
     const monthKey = data.monthKey;
     if (typeof monthKey !== 'string' || !/^\d{4}-(0[1-9]|1[0-2])$/.test(monthKey)) {
       return { allowed: false, reason: 'invalid-month-key' };
@@ -86,17 +89,31 @@ function evaluateRules(context: EvaluationContext): { allowed: boolean; reason?:
 
   // Monthly subcollections: users/{uid}/months/{monthKey}
   if (parts[2] === 'months') {
-    const monthKey = parts[3];
-    if (!monthKey || !/^\d{4}-(0[1-9]|1[0-2])$/.test(monthKey)) {
-      return { allowed: false, reason: 'invalid-month-key' };
+    if (parts.length === 3 && operation === 'list') {
+      return { allowed: true };
     }
 
+    const monthKey = parts[3];
+
     if (parts.length === 4) {
+      if (operation === 'read' || operation === 'delete') {
+        return { allowed: true };
+      }
+      if (!monthKey || !/^\d{4}-(0[1-9]|1[0-2])$/.test(monthKey)) {
+        return { allowed: false, reason: 'invalid-month-key' };
+      }
+      if (request.resource?.data?.schemaVersion !== 2) {
+        return { allowed: false, reason: 'invalid-schema-version' };
+      }
       return { allowed: true };
     }
 
     const subcollection = parts[4];
     if (operation === 'read' || operation === 'delete') return { allowed: true };
+
+    if (!monthKey || !/^\d{4}-(0[1-9]|1[0-2])$/.test(monthKey)) {
+      return { allowed: false, reason: 'invalid-month-key' };
+    }
 
     const data = request.resource?.data ?? {};
 
@@ -125,6 +142,7 @@ function evaluateRules(context: EvaluationContext): { allowed: boolean; reason?:
     }
 
     if (subcollection === 'categoryBudgets') {
+      if (data.schemaVersion !== 2) return { allowed: false, reason: 'invalid-schema-version' };
       if (typeof data.limit !== 'number' || data.limit < 0) return { allowed: false, reason: 'negative-amount' };
       return { allowed: true };
     }
@@ -140,6 +158,208 @@ describe('Firestore Security Rules verification', () => {
     expect(rulesContent).toContain("rules_version = '2'");
     expect(rulesContent).toContain('service cloud.firestore');
     expect(rulesContent).toContain('match /databases/{database}/documents');
+  });
+
+  it('allows the owner to list month documents without weakening month write validation', () => {
+    const monthRuleStart = rulesContent.indexOf('match /months/{monthKey}');
+    const expenseRuleStart = rulesContent.indexOf('match /expenses/{expenseId}', monthRuleStart);
+    const monthDocumentRule = rulesContent.slice(monthRuleStart, expenseRuleStart);
+
+    // Regression: the former combined read/write rule depended on monthKey and
+    // Firestore rejected the entire users/{uid}/months collection query.
+    expect(monthDocumentRule).toContain('allow read: if isOwner(uid);');
+    expect(monthDocumentRule).not.toContain('allow read, write:');
+    expect(evaluateRules({
+      request: { auth: { uid: 'user-1' } },
+      path: 'users/user-1/months',
+      operation: 'list',
+    }).allowed).toBe(true);
+    expect(evaluateRules({
+      request: { auth: { uid: 'attacker-uid' } },
+      path: 'users/user-1/months',
+      operation: 'list',
+    }).allowed).toBe(false);
+    expect(evaluateRules({
+      request: { auth: { uid: 'user-1' }, resource: { data: { schemaVersion: 2 } } },
+      path: 'users/user-1/months/not-a-month',
+      operation: 'create',
+    }).allowed).toBe(false);
+  });
+
+  // Task 7: Specifically reproduces authenticated owner LIST/query of /users/{uid}/months on empty db
+  it('AKÇE-017B: specifically allows authenticated owner to perform LIST/query of /users/{uid}/months when database is empty', () => {
+    // 1. In security rules: allow read on match /months/{monthKey} must only require isOwner(uid)
+    // without requiring validMonthKey(monthKey) on read.
+    const monthRuleMatch = rulesContent.match(/match \/months\/\{monthKey\}[\s\S]*?(?=match \/expenses)/);
+    expect(monthRuleMatch).not.toBeNull();
+    const monthRuleBlock = monthRuleMatch![0];
+    const readRuleLine = monthRuleBlock.split('\n').find(line => line.includes('allow read:'));
+    expect(readRuleLine).toBeDefined();
+    expect(readRuleLine!.trim()).toBe('allow read: if isOwner(uid);');
+    expect(readRuleLine).not.toContain('validMonthKey');
+
+    // 2. Evaluator check: LIST operation on users/{uid}/months is allowed for the owner
+    const res = evaluateRules({
+      request: { auth: { uid: 'owner-uid' } },
+      path: 'users/owner-uid/months',
+      operation: 'list',
+    });
+    expect(res.allowed).toBe(true);
+  });
+
+  // Task 8: Verification of month security & subcollection isolation
+  describe('AKÇE-017B: Month and subcollection security validations', () => {
+    it('denies invalid month document writes (invalid monthKey format)', () => {
+      const invalidKeys = ['not-a-month', '2026-13', '2026-00', '2026-9', '202609'];
+      for (const invalidKey of invalidKeys) {
+        const res = evaluateRules({
+          request: {
+            auth: { uid: 'user-1' },
+            resource: { data: { schemaVersion: 2, monthKey: invalidKey } },
+          },
+          path: `users/user-1/months/${invalidKey}`,
+          operation: 'create',
+        });
+        expect(res.allowed, `Expected write to monthKey "${invalidKey}" to be denied`).toBe(false);
+        expect(res.reason).toBe('invalid-month-key');
+      }
+    });
+
+    it('denies month document writes with invalid schemaVersion', () => {
+      const res = evaluateRules({
+        request: {
+          auth: { uid: 'user-1' },
+          resource: { data: { schemaVersion: 1, monthKey: '2026-09' } },
+        },
+        path: 'users/user-1/months/2026-09',
+        operation: 'create',
+      });
+      expect(res.allowed).toBe(false);
+      expect(res.reason).toBe('invalid-schema-version');
+    });
+
+    it('denies another UID from reading or listing months', () => {
+      // Attacker cannot list months
+      const listRes = evaluateRules({
+        request: { auth: { uid: 'attacker-uid' } },
+        path: 'users/user-1/months',
+        operation: 'list',
+      });
+      expect(listRes.allowed).toBe(false);
+      expect(listRes.reason).toBe('not-owner');
+
+      // Attacker cannot read a specific month
+      const readRes = evaluateRules({
+        request: { auth: { uid: 'attacker-uid' } },
+        path: 'users/user-1/months/2026-09',
+        operation: 'read',
+      });
+      expect(readRes.allowed).toBe(false);
+      expect(readRes.reason).toBe('not-owner');
+
+      // Unauthenticated cannot list or read months
+      expect(evaluateRules({
+        request: { auth: null },
+        path: 'users/user-1/months',
+        operation: 'list',
+      }).allowed).toBe(false);
+
+      expect(evaluateRules({
+        request: { auth: null },
+        path: 'users/user-1/months/2026-09',
+        operation: 'read',
+      }).allowed).toBe(false);
+    });
+
+    it('allows valid owner month writes with valid monthKey and schemaVersion 2', () => {
+      const res = evaluateRules({
+        request: {
+          auth: { uid: 'user-1' },
+          resource: { data: { monthKey: '2026-09', schemaVersion: 2, deviceId: 'device-1' } },
+        },
+        path: 'users/user-1/months/2026-09',
+        operation: 'create',
+      });
+      expect(res.allowed).toBe(true);
+    });
+
+    it('preserves existing subcollection security for all monthly data types', () => {
+      const validSubcollections = [
+        { name: 'expenses', data: { schemaVersion: 2, amount: 150, type: 'zorunlu', paymentMethod: 'kart', monthKey: '2026-09' } },
+        { name: 'incomes', data: { schemaVersion: 2, amount: 2000, name: 'Maaş', monthKey: '2026-09' } },
+        { name: 'fixedExpenses', data: { schemaVersion: 2, amount: 500, name: 'Kira', monthKey: '2026-09' } },
+        { name: 'investments', data: { schemaVersion: 2, plannedAmount: 1000, actualAmount: 1000, monthKey: '2026-09' } },
+        { name: 'categoryBudgets', data: { schemaVersion: 2, limit: 1200, monthKey: '2026-09' } },
+      ];
+
+      for (const item of validSubcollections) {
+        const itemPath = `users/user-1/months/2026-09/${item.name}/item-1`;
+
+        // Valid owner write allowed
+        expect(evaluateRules({
+          request: { auth: { uid: 'user-1' }, resource: { data: item.data } },
+          path: itemPath,
+          operation: 'create',
+        }).allowed).toBe(true);
+
+        // Attacker write denied
+        expect(evaluateRules({
+          request: { auth: { uid: 'attacker-uid' }, resource: { data: item.data } },
+          path: itemPath,
+          operation: 'create',
+        }).allowed).toBe(false);
+
+        // Invalid monthKey in path denied
+        expect(evaluateRules({
+          request: { auth: { uid: 'user-1' }, resource: { data: item.data } },
+          path: `users/user-1/months/bad-key/${item.name}/item-1`,
+          operation: 'create',
+        }).allowed).toBe(false);
+
+        // Invalid schemaVersion denied
+        expect(evaluateRules({
+          request: { auth: { uid: 'user-1' }, resource: { data: { ...item.data, schemaVersion: 1 } } },
+          path: itemPath,
+          operation: 'create',
+        }).allowed).toBe(false);
+      }
+    });
+  });
+
+  it('accepts every first-migration DTO shape and rejects undefined fields', () => {
+    const timestamp = { kind: 'server-timestamp' };
+    const monthKey = seedData.selectedMonthKey;
+    const dtoCases = [
+      ['users/user-1/assets/asset-1', toFirestoreDto(seedData.assets[0], 'device-1', timestamp)],
+      ['users/user-1/goals/goal-1', toFirestoreDto(seedData.goals[0], 'device-1', timestamp)],
+      ['users/user-1/assetSnapshots/snapshot-1', toFirestoreDto({ id: 'snapshot-1', assetId: 'asset-1', monthKey, amount: 100, createdAt: 1 }, 'device-1', timestamp)],
+      [`users/user-1/months/${monthKey}/expenses/expense-1`, toFirestoreDto(seedData.expenses[0], 'device-1', timestamp)],
+      [`users/user-1/months/${monthKey}/incomes/income-1`, toFirestoreDto(seedData.incomes[0], 'device-1', timestamp)],
+      [`users/user-1/months/${monthKey}/fixedExpenses/fixed-1`, toFirestoreDto(seedData.fixedExpenses[0], 'device-1', timestamp)],
+      [`users/user-1/months/${monthKey}/investments/inv-2`, toFirestoreDto(seedData.investments[1], 'device-1', timestamp)],
+      [`users/user-1/months/${monthKey}/categoryBudgets/cat-1`, toFirestoreDto(seedData.categoryBudgets[0], 'device-1', timestamp)],
+    ] as const;
+
+    for (const [documentPath, data] of dtoCases) {
+      expect(Object.values(data)).not.toContain(undefined);
+      expect(evaluateRules({
+        request: { auth: { uid: 'user-1' }, resource: { data } },
+        path: documentPath,
+        operation: 'create',
+      }), documentPath).toMatchObject({ allowed: true });
+    }
+
+    const directWrites = [
+      [`users/user-1/months/${monthKey}`, { monthKey, schemaVersion: 2, deviceId: 'device-1' }],
+      ['users/user-1/meta/migration', { uid: 'user-1', schemaVersion: 2, completedAt: 1, source: 'local', recordCounts: {} }],
+    ] as const;
+    for (const [documentPath, data] of directWrites) {
+      expect(evaluateRules({
+        request: { auth: { uid: 'user-1' }, resource: { data } },
+        path: documentPath,
+        operation: 'create',
+      }), documentPath).toMatchObject({ allowed: true });
+    }
   });
 
   // 1. owner read → ALLOW

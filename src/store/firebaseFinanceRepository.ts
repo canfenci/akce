@@ -9,7 +9,7 @@ const deviceStorageKey = 'akce-v1-device-id';
 const monthlyCollections = ['expenses', 'incomes', 'fixedExpenses', 'investments', 'categoryBudgets'] as const;
 const globalCollections = ['assets', 'goals', 'assetSnapshots'] as const;
 
-function normalizeRepositoryError(error: unknown): FinanceRepositoryError {
+export function normalizeRepositoryError(error: unknown): FinanceRepositoryError {
   if (error instanceof FinanceRepositoryError) return error;
   const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : '';
   if (code === 'permission-denied' || code === 'firestore/permission-denied') return new FinanceRepositoryError('permission-denied', 'Firestore erişim izni reddedildi.', error);

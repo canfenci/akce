@@ -5,7 +5,7 @@ import { localStorageFinanceRepository, storageKey } from './localStorageFinance
 import { createFirebaseFinanceRepository } from './firebaseFinanceRepository';
 import { createFirestoreGateway } from './firestoreGateway';
 import { FinanceSyncCoordinator, type SyncStatus } from './financeSyncCoordinator';
-import type { FinanceMutation, FinanceSubscriptionUpdate } from './financeRepository';
+import { getFirebaseErrorDetails, type FinanceMutation, type FinanceSubscriptionUpdate } from './financeRepository';
 import { getPreferredCacheMode } from './devicePreference';
 import { useAuth } from '../auth/AuthProvider';
 
@@ -214,6 +214,11 @@ export function AkceStoreProvider({
       onSyncStatusChange: setSyncStatus,
       onHydrateState: nextState => rawDispatch({ type: 'SYNC_HYDRATE_STATE', state: nextState }),
       onSubscriptionUpdate: update => rawDispatch({ type: 'SYNC_SUBSCRIPTION_UPDATE', update }),
+      onError: error => {
+        if (import.meta.env.DEV) {
+          console.error('[AKÇE Firestore sync]', getFirebaseErrorDetails(error));
+        }
+      },
     });
   }, [injectedCoordinator]);
 
@@ -277,4 +282,3 @@ export function useSyncStatus(): SyncStatus {
   const { syncStatus } = useAkceStore();
   return syncStatus;
 }
-

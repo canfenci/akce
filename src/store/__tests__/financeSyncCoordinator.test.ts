@@ -12,6 +12,7 @@ import { migrationMarkerPath } from '../migrationMarker';
 import { monthlyDocumentPath } from '../firestorePaths';
 import type { FirestoreGateway, GatewayBatchOperation, GatewayDocument } from '../firestoreGateway';
 import { filterUserRecords } from '../seedProtection';
+import { getFirebaseErrorDetails } from '../financeRepository';
 
 class MemoryStorage implements Storage {
   private store = new Map<string, string>();
@@ -97,7 +98,7 @@ const uid = 'user-test-123';
 const monthKey = '2026-09';
 const deviceId = 'test-device-1';
 
-function createTestSetup(overrides?: { isOnline?: () => boolean }) {
+function createTestSetup(overrides?: { isOnline?: () => boolean; onError?: (error: Error) => void }) {
   const gateway = new MemoryFirestoreGateway();
   const storage = new MemoryStorage();
   const firebaseRepo = new FirebaseFinanceRepository(gateway, deviceId);
@@ -116,6 +117,7 @@ function createTestSetup(overrides?: { isOnline?: () => boolean }) {
     isOnline,
     onSyncStatusChange: status => statusHistory.push(status),
     onHydrateState: state => { hydratedState = state; },
+    onError: overrides?.onError,
   });
 
   return {
@@ -593,5 +595,42 @@ describe('AKÇE-008C — Finance Sync Coordinator & Migration', () => {
 
     expect(coordinator.getActiveRepository().kind).toBe('local');
     expect(coordinator.getSyncStatus()).toBe('idle');
+  });
+
+  it('21. preserves permission-denied details when month discovery fails before the first batch', async () => {
+    const errors: Error[] = [];
+    const { coordinator, gateway } = createTestSetup({ onError: error => errors.push(error) });
+    const originalGetDocuments = gateway.getDocuments.bind(gateway);
+    const getDocuments = vi.spyOn(gateway, 'getDocuments').mockImplementation(async collectionPath => {
+      if (collectionPath === `users/${uid}/months`) {
+        throw Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' });
+      }
+      return originalGetDocuments(collectionPath);
+    });
+    const localState = createEmptyLocalState();
+    localState.expenses.push({
+      id: 'exp-production-regression',
+      amount: 1000,
+      category: 'Sosyal',
+      type: 'isteğe bağlı',
+      paymentMethod: 'kart',
+      date: '2026-09-03',
+      monthKey,
+      createdAt: 1000,
+      updatedAt: 1000,
+      userId: 'local-user',
+    });
+
+    await coordinator.handleAuthChange({ uid }, monthKey, localState);
+
+    expect(getDocuments).toHaveBeenCalledWith(`users/${uid}/months`);
+    expect(coordinator.getSyncStatus()).toBe('error');
+    expect(coordinator.getActiveRepository().kind).toBe('local');
+    expect(gateway.docs.size).toBe(0);
+    expect(errors).toHaveLength(1);
+    expect(getFirebaseErrorDetails(errors[0])).toEqual({
+      code: 'permission-denied',
+      message: 'Missing or insufficient permissions.',
+    });
   });
 });
