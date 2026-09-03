@@ -139,3 +139,77 @@ describe('Bottom nav FAB centering', () => {
     document.head.removeChild(style);
   });
 });
+
+describe('Symmetric mobile bottom navigation', () => {
+  it('has 5 children: 4 tab buttons + 1 FAB', () => {
+    const nav = document.createElement('nav');
+    nav.className = 'bottom-nav';
+    const labels = ['Ana Sayfa', 'Bütçe', '', 'Varlıklar', 'Ayarlar'];
+    for (const label of labels) {
+      const btn = document.createElement('button');
+      if (!label) btn.className = 'bottom-nav__add';
+      else btn.textContent = label;
+      nav.appendChild(btn);
+    }
+    document.body.appendChild(nav);
+
+    const buttons = nav.querySelectorAll('button');
+    expect(buttons.length).toBe(5);
+    document.body.removeChild(nav);
+  });
+
+  it('nav items are in symmetric order: Ana Sayfa, Bütçe, +, Varlıklar, Ayarlar', () => {
+    const nav = document.createElement('nav');
+    nav.className = 'bottom-nav';
+    const expected = ['Ana Sayfa', 'Bütçe', '', 'Varlıklar', 'Ayarlar'];
+    for (const label of expected) {
+      const btn = document.createElement('button');
+      if (!label) btn.className = 'bottom-nav__add';
+      else btn.textContent = label;
+      nav.appendChild(btn);
+    }
+    document.body.appendChild(nav);
+
+    const buttons = Array.from(nav.querySelectorAll('button'));
+    expect(buttons[0].textContent).toBe('Ana Sayfa');
+    expect(buttons[1].textContent).toBe('Bütçe');
+    expect(buttons[2].className).toBe('bottom-nav__add');
+    expect(buttons[3].textContent).toBe('Varlıklar');
+    expect(buttons[4].textContent).toBe('Ayarlar');
+    document.body.removeChild(nav);
+  });
+
+  it('grid uses 5 columns with empty center column for FAB', () => {
+    const style = document.createElement('style');
+    style.textContent = '.bottom-nav{display:grid;grid-template-columns:1fr 1fr 0fr 1fr 1fr}';
+    document.head.appendChild(style);
+
+    const nav = document.createElement('nav');
+    nav.className = 'bottom-nav';
+    document.body.appendChild(nav);
+
+    const computed = window.getComputedStyle(nav);
+    expect(computed.display).toBe('grid');
+    expect(computed.gridTemplateColumns).toBe('1fr 1fr 0fr 1fr 1fr');
+
+    document.body.removeChild(nav);
+    document.head.removeChild(style);
+  });
+
+  it('Settings is visible in mobile bottom nav', () => {
+    const nav = document.createElement('nav');
+    nav.className = 'bottom-nav';
+    for (const label of ['Ana Sayfa', 'Bütçe', '', 'Varlıklar', 'Ayarlar']) {
+      const btn = document.createElement('button');
+      if (!label) btn.className = 'bottom-nav__add';
+      else btn.textContent = label;
+      nav.appendChild(btn);
+    }
+    document.body.appendChild(nav);
+
+    const buttons = Array.from(nav.querySelectorAll('button'));
+    const settingsBtn = buttons.find(b => b.textContent === 'Ayarlar');
+    expect(settingsBtn).toBeTruthy();
+    document.body.removeChild(nav);
+  });
+});

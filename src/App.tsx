@@ -52,10 +52,11 @@ function FinanceApp() {
     <header className="mobile-header"><button className="icon-button" onClick={() => setMenuOpen(true)} aria-label="Menüyü aç"><Icon name="menu"/></button><div className="wordmark">akçe<span>.</span></div><button className="avatar" aria-label="Profil">MB</button></header>
     <main>{screen}</main>
     <nav className="bottom-nav">
-      <button className={page === 'home' ? 'active' : ''} onClick={() => setPage('home')}><Icon name="home"/><span>Ana Sayfa</span></button>
-      <button className={page === 'budget' ? 'active' : ''} onClick={() => setPage('budget')}><Icon name="wallet"/><span>Bütçe</span></button>
+      <button className={page === 'home' ? 'active' : ''} onClick={() => setPage('home')} style={{ gridColumn: 1 }}><Icon name="home"/><span>Ana Sayfa</span></button>
+      <button className={page === 'budget' ? 'active' : ''} onClick={() => setPage('budget')} style={{ gridColumn: 2 }}><Icon name="wallet"/><span>Bütçe</span></button>
       <button className="bottom-nav__add" onClick={() => setQuickOpen(true)} aria-label="Hızlı harcama ekle"><Icon name="plus"/></button>
-      <button className={page === 'assets' ? 'active' : ''} onClick={() => setPage('assets')}><Icon name="target"/><span>Varlıklar</span></button>
+      <button className={page === 'assets' ? 'active' : ''} onClick={() => setPage('assets')} style={{ gridColumn: 4 }}><Icon name="target"/><span>Varlıklar</span></button>
+      <button className={page === 'settings' ? 'active' : ''} onClick={() => setPage('settings')} style={{ gridColumn: 5 }}><Icon name="settings"/><span>Ayarlar</span></button>
     </nav>
     {menuOpen && <div className="drawer-layer" onMouseDown={event => { if (event.target === event.currentTarget) setMenuOpen(false); }}><aside className="drawer"><header><div className="wordmark">akçe<span>.</span></div><button className="icon-button" onClick={() => setMenuOpen(false)} aria-label="Menüyü kapat"><Icon name="close"/></button></header><p>Az özellik. Çok disiplin.</p><nav>{navItems.slice(1).map(item => <button key={item.id} className={page === item.id ? 'active' : ''} onClick={() => setPage(item.id)}><Icon name={item.icon}/>{item.label}<Icon name="arrow"/></button>)}</nav></aside></div>}
     <QuickExpenseSheet open={quickOpen} onClose={() => setQuickOpen(false)} />
