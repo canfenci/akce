@@ -108,7 +108,7 @@ export function calculateMonthSummary(
   
   // Yatırım planı gerçekleşme oranı
   const actualInvestments = investments
-    .filter(inv => inv.monthKey === monthKey && inv.completed)
+    .filter(inv => inv.monthKey === monthKey)
     .reduce((sum, inv) => sum + inv.actualAmount, 0);
   const investmentPlanRealizationRate = totalFixedInvestment > 0
     ? (actualInvestments / totalFixedInvestment) * 100
@@ -175,6 +175,18 @@ export function getTotalAssetTargets(assets: Asset[]): number {
 
 export function calculateInvestmentRatio(totalIncome: number, totalActualInvestments: number): number {
   return totalIncome > 0 ? (totalActualInvestments / totalIncome) * 100 : 0;
+}
+
+export function getInvestmentProgress(investment: Investment): number {
+  return investment.plannedAmount > 0 ? (investment.actualAmount / investment.plannedAmount) * 100 : 0;
+}
+
+export function getInvestmentRemaining(investment: Investment): number {
+  return Math.max(0, investment.plannedAmount - investment.actualAmount);
+}
+
+export function isInvestmentCompleted(investment: Investment): boolean {
+  return investment.plannedAmount > 0 && investment.actualAmount >= investment.plannedAmount;
 }
 
 export function calculateExpenseRatio(totalIncome: number, totalFixedExpenses: number, totalVariableExpenses: number): number {

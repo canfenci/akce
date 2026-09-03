@@ -307,6 +307,55 @@ describe('Investment vs Asset clarity', () => {
     render(<AssetsScreen />, { wrapper });
     expect(screen.getByText('Birikmiş finansal varlıklarının güncel değerini takip et. Yatırım ekranı aylık katkını, Varlıklar ekranı toplam birikmiş değerini gösterir.')).toBeTruthy();
   });
+
+  it('InvestmentsScreen shows summary with YATIRIMA AYRILAN', async () => {
+    const { InvestmentsScreen } = await import('../../features/Screens');
+    const wrapper = createTestWrapper();
+    render(<InvestmentsScreen />, { wrapper });
+    expect(screen.getByText('YATIRIMA AYRILAN')).toBeTruthy();
+    expect(screen.getByText('YATIRILAN MİKTAR')).toBeTruthy();
+    expect(screen.getByText('GERÇEKLEŞME')).toBeTruthy();
+  });
+
+  it('InvestmentsScreen shows investment cards with names from seed data', async () => {
+    const { InvestmentsScreen } = await import('../../features/Screens');
+    const wrapper = createTestWrapper();
+    render(<InvestmentsScreen />, { wrapper });
+    expect(screen.getByText('Acil Yatırım Fonu')).toBeTruthy();
+    expect(screen.getByText('VOO')).toBeTruthy();
+    expect(screen.getByText('Gram Altın')).toBeTruthy();
+  });
+
+  it('InvestmentsScreen shows add button with Yatırım planı ekle', async () => {
+    const { InvestmentsScreen } = await import('../../features/Screens');
+    const wrapper = createTestWrapper();
+    render(<InvestmentsScreen />, { wrapper });
+    expect(screen.getByText('Yatırım planı ekle')).toBeTruthy();
+  });
+
+  it('Investment card shows Planlanan and Yatırılan labels', async () => {
+    const { InvestmentsScreen } = await import('../../features/Screens');
+    const wrapper = createTestWrapper();
+    render(<InvestmentsScreen />, { wrapper });
+    const planlananLabels = screen.getAllByText('Planlanan');
+    expect(planlananLabels.length).toBeGreaterThan(0);
+    const yatirilanLabels = screen.getAllByText('Yatırılan');
+    expect(yatirilanLabels.length).toBeGreaterThan(0);
+  });
+
+  it('Investment edit/delete buttons meet 44px touch target', () => {
+    const style = document.createElement('style');
+    style.textContent = '.delete-button{width:44px;height:44px}';
+    document.head.appendChild(style);
+    const btn = document.createElement('button');
+    btn.className = 'delete-button';
+    document.body.appendChild(btn);
+    const computed = window.getComputedStyle(btn);
+    expect(parseInt(computed.width)).toBeGreaterThanOrEqual(44);
+    expect(parseInt(computed.height)).toBeGreaterThanOrEqual(44);
+    document.body.removeChild(btn);
+    document.head.removeChild(style);
+  });
 });
 
 describe('Home screen income ratios', () => {

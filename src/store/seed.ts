@@ -39,11 +39,11 @@ export const seedData: AkceData = {
     { id: 'fixed-3', name: 'Abonelikler', amount: 5000, dueDay: 18, category: 'Abonelik', frequency: 'monthly', active: true, monthKey, ...common },
   ],
   investments: [
-    { id: 'inv-1', group: 'TEFAS', plannedAmount: 9000, actualAmount: 9000, completed: true, completedDate: dateAgo(1), monthKey, ...common },
-    { id: 'inv-2', group: 'Nasdaq', plannedAmount: 5500, actualAmount: 0, completed: false, monthKey, ...common },
-    { id: 'inv-3', group: 'Altın', plannedAmount: 3500, actualAmount: 3500, completed: true, completedDate: dateAgo(1), monthKey, ...common },
-    { id: 'inv-4', group: 'Gümüş', plannedAmount: 1500, actualAmount: 0, completed: false, monthKey, ...common },
-    { id: 'inv-5', group: 'BES', plannedAmount: 3000, actualAmount: 3000, completed: true, completedDate: dateAgo(1), monthKey, ...common },
+    { id: 'inv-1', group: 'TEFAS', name: 'Acil Yatırım Fonu', plannedAmount: 9000, actualAmount: 9000, completed: true, completedDate: dateAgo(1), monthKey, ...common },
+    { id: 'inv-2', group: 'ABD Hisse / ETF', name: 'VOO', plannedAmount: 5500, actualAmount: 0, completed: false, monthKey, ...common },
+    { id: 'inv-3', group: 'Altın', name: 'Gram Altın', plannedAmount: 3500, actualAmount: 3500, completed: true, completedDate: dateAgo(1), monthKey, ...common },
+    { id: 'inv-4', group: 'Gümüş', name: 'Gümüş Fonu', plannedAmount: 1500, actualAmount: 0, completed: false, monthKey, ...common },
+    { id: 'inv-5', group: 'BES', name: 'Allianz BES', plannedAmount: 3000, actualAmount: 3000, completed: true, completedDate: dateAgo(1), monthKey, ...common },
   ],
   expenses: [
     { id: 'expense-1', amount: 2650, category: 'Market', type: 'zorunlu', paymentMethod: 'kart', note: 'Haftalık alışveriş', date: dateAgo(0), monthKey, ...common },

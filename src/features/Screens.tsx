@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { coachProvider } from '../domain/coachEngine';
-import { calculateMonthSummary, calculateInvestmentRatio, calculateExpenseRatio, formatCurrency, formatPercentage, formatRatio, getAssetProgress, getMonthKey, getTotalAssets, getTotalAssetTargets } from '../domain/financeEngine';
+import { calculateMonthSummary, calculateInvestmentRatio, calculateExpenseRatio, formatCurrency, formatPercentage, formatRatio, getAssetProgress, getInvestmentProgress, getInvestmentRemaining, isInvestmentCompleted, getMonthKey, getTotalAssets, getTotalAssetTargets } from '../domain/financeEngine';
 import { formatMonthKey, getMonthCalculationDate, shiftMonthKey } from '../domain/month';
-import type { Asset, AssetGroup, AssetUnit, Income, FixedExpense, CategoryBudget, Investment } from '../domain/types';
-import { ASSET_GROUPS, ASSET_GROUP_LABELS, ASSET_UNITS, ASSET_UNIT_LABELS } from '../domain/types';
+import type { Asset, AssetGroup, AssetUnit, Income, FixedExpense, CategoryBudget, Investment, InvestmentGroup } from '../domain/types';
+import { ASSET_GROUPS, ASSET_GROUP_LABELS, ASSET_UNITS, ASSET_UNIT_LABELS, INVESTMENT_GROUPS, INVESTMENT_GROUP_LABELS } from '../domain/types';
 import { useAkceStore } from '../store/AkceStore';
 import { useAuth } from '../auth/AuthProvider';
 import { getIsDeviceTrusted, setIsDeviceTrusted } from '../store/devicePreference';
@@ -313,36 +313,60 @@ export function BudgetScreen({ initialTab = 'Genel Bakış', openFormSignal, onF
   </div>
   );
 }
-const INVESTMENT_GROUPS = ['TEFAS', 'Nasdaq', 'Altın', 'Gümüş', 'BES'] as const;
-const INVESTMENT_GROUP_LABELS: Record<string, string> = { TEFAS: 'TEFAS', Nasdaq: 'ABD / Nasdaq', Altın: 'Altın', Gümüş: 'Gümüş', BES: 'Bireysel Emeklilik' };
-
 export function InvestmentsScreen({ openFormSignal, onFormSignalConsumed }: { openFormSignal?: string | null; onFormSignalConsumed?: () => void }) {
   const { state, dispatch } = useAkceStore(); const summary = useSummary();
   const monthInvestments = state.investments.filter(item => item.monthKey === state.selectedMonthKey);
 
-  const [investForm, setInvestForm] = useState<{ isOpen: boolean; mode: 'add' | 'edit' }>({ isOpen: false, mode: 'add' });
-  const [investGroup, setInvestGroup] = useState<string>('TEFAS');
+  const totalPlanned = monthInvestments.reduce((s, i) => s + i.plannedAmount, 0);
+  const totalActual = monthInvestments.reduce((s, i) => s + i.actualAmount, 0);
+  const aggregateProgress = totalPlanned > 0 ? (totalActual / totalPlanned) * 100 : 0;
+
+  const [investForm, setInvestForm] = useState<{ isOpen: boolean; mode: 'add' | 'edit'; current?: Investment }>({ isOpen: false, mode: 'add' });
+  const [investGroup, setInvestGroup] = useState<InvestmentGroup>('TEFAS');
+  const [investName, setInvestName] = useState('');
   const [investPlanned, setInvestPlanned] = useState('');
   const [investActual, setInvestActual] = useState('');
   const [investError, setInvestError] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; investment?: Investment }>({ isOpen: false });
 
   const investSheetRef = useDialogSheet(investForm.isOpen, () => setInvestForm({ isOpen: false, mode: 'add' }));
+  const deleteSheetRef = useDialogSheet(deleteConfirm.isOpen, () => setDeleteConfirm({ isOpen: false }));
   const viewportHeight = useVisualViewportHeight();
   const sheetMaxHeight = viewportHeight > 0 ? `${Math.floor(viewportHeight * 0.94)}px` : '94vh';
 
   const openAddInvestment = () => {
-    setInvestGroup('TEFAS'); setInvestPlanned(''); setInvestActual(''); setInvestError('');
+    setInvestGroup('TEFAS'); setInvestName(''); setInvestPlanned(''); setInvestActual(''); setInvestError('');
     setInvestForm({ isOpen: true, mode: 'add' });
+  };
+
+  const openEditInvestment = (inv: Investment) => {
+    setInvestGroup(inv.group); setInvestName(inv.name); setInvestPlanned(String(inv.plannedAmount)); setInvestActual(String(inv.actualAmount)); setInvestError('');
+    setInvestForm({ isOpen: true, mode: 'edit', current: inv });
   };
 
   const saveInvestment = () => {
     const planned = Number(investPlanned);
     const actual = Number(investActual) || 0;
+    if (!investName.trim()) { setInvestError('Ad boş olamaz.'); return; }
     if (!Number.isFinite(planned) || planned <= 0) { setInvestError('Planlanan tutar 0\'dan büyük olmalı.'); return; }
     if (!Number.isFinite(actual) || actual < 0) { setInvestError('Gerçekleşen tutar 0 veya daha büyük olmalı.'); return; }
     const now = Date.now();
-    dispatch({ type: 'ADD_INVESTMENT', payload: { id: crypto.randomUUID(), group: investGroup as Investment['group'], plannedAmount: planned, actualAmount: actual, completed: false, monthKey: state.selectedMonthKey, createdAt: now, updatedAt: now, userId: 'local-user' } });
+    const isCompleted = planned > 0 && actual >= planned;
+    if (investForm.mode === 'edit' && investForm.current) {
+      dispatch({ type: 'UPDATE_INVESTMENT', payload: { ...investForm.current, group: investGroup, name: investName.trim(), plannedAmount: planned, actualAmount: actual, completed: isCompleted, completedDate: isCompleted && !investForm.current.completed ? new Date().toISOString().slice(0, 10) : investForm.current.completedDate, updatedAt: now } });
+    } else {
+      dispatch({ type: 'ADD_INVESTMENT', payload: { id: crypto.randomUUID(), group: investGroup, name: investName.trim(), plannedAmount: planned, actualAmount: actual, completed: isCompleted, completedDate: isCompleted ? new Date().toISOString().slice(0, 10) : undefined, monthKey: state.selectedMonthKey, createdAt: now, updatedAt: now, userId: 'local-user' } });
+    }
     setInvestForm({ isOpen: false, mode: 'add' });
+  };
+
+  const openDeleteConfirm = (inv: Investment) => setDeleteConfirm({ isOpen: true, investment: inv });
+
+  const confirmDelete = () => {
+    if (deleteConfirm.investment) {
+      dispatch({ type: 'DELETE_INVESTMENT', id: deleteConfirm.investment.id });
+    }
+    setDeleteConfirm({ isOpen: false });
   };
 
   useEffect(() => {
@@ -352,17 +376,68 @@ export function InvestmentsScreen({ openFormSignal, onFormSignalConsumed }: { op
     }
   }, [openFormSignal]);
 
-  return <div className="screen"><PageHeader eyebrow="GELECEĞE AYRILAN" title="Yatırımlar" description="Bu ay yatırım için ayırdığın tutarları takip et. Birikmiş portföy değerini değil, aylık yatırım katkını takip edersin." /><MonthNavigation /><div className="protect-banner"><Icon name="target"/><div><b>Yatırım bütçen koruma altında</b><p>{formatCurrency(summary.totalFixedInvestment)} harcanabilir bütçeye dahil edilmedi.</p></div><strong>%{Math.round(summary.investmentPlanRealizationRate)}</strong></div><button className="add-inline" onClick={openAddInvestment}><Icon name="plus" /> Yeni yatırım planı</button>{monthInvestments.length === 0 ? <section className="empty-state"><Icon name="chart" /><p><b>Bu ay için henüz yatırım planın yok.</b></p><small>Yatırım, bu ay geleceğin için ayırdığın tutardır.</small><button className="primary-button" onClick={openAddInvestment}>Yatırım planı ekle</button></section> : <section className="investment-grid">{monthInvestments.map(item => <article className={`investment-card ${item.completed ? 'completed' : ''}`} key={item.id}><span className="asset-monogram">{item.group.slice(0, 2).toLocaleUpperCase('tr-TR')}</span><div className="investment-card__details"><div><span>{item.group}</span><h3>{formatCurrency(item.plannedAmount)}</h3><small>Aylık plan</small></div>{item.actualAmount > 0 && <span className="investment-card__actual">Gerçekleşen: <b>{formatCurrency(item.actualAmount)}</b></span>}</div><button onClick={() => dispatch({ type: 'TOGGLE_INVESTMENT', id: item.id })}><span>{item.completed && <Icon name="check"/>}</span>{item.completed ? 'Tamamlandı' : 'Tamamla'}</button></article>)}</section>}
+  return <div className="screen"><PageHeader eyebrow="GELECEĞE AYRILAN" title="Yatırımlar" description="Bu ay yatırım için ayırdığın tutarları takip et. Birikmiş portföy değerini değil, aylık yatırım katkını takip edersin." /><MonthNavigation />
+
+    <section className="investment-summary">
+      <div className="investment-summary__row">
+        <div className="investment-summary__item"><span className="eyebrow">YATIRIMA AYRILAN</span><strong>{formatCurrency(totalPlanned)}</strong></div>
+        <div className="investment-summary__item"><span className="eyebrow">YATIRILAN MİKTAR</span><strong>{formatCurrency(totalActual)}</strong></div>
+        <div className="investment-summary__item"><span className="eyebrow">GERÇEKLEŞME</span><strong>%{Math.round(aggregateProgress)}</strong></div>
+      </div>
+    </section>
+
+    <div className="protect-banner"><Icon name="target"/><div><b>Yatırım bütçen koruma altında</b><p>{formatCurrency(summary.totalFixedInvestment)} harcanabilir bütçeye dahil edilmedi.</p></div></div>
+    <button className="add-inline" onClick={openAddInvestment}><Icon name="plus" /> Yatırım planı ekle</button>
+
+    {monthInvestments.length === 0 ? <section className="empty-state"><Icon name="chart" /><p><b>Bu ay için henüz yatırım planın yok.</b></p><small>Yatırım, bu ay geleceğin için ayırdığın tutardır.</small><button className="primary-button" onClick={openAddInvestment}>Yatırım planı ekle</button></section> : <section className="investment-grid">{monthInvestments.map(item => {
+      const progress = getInvestmentProgress(item);
+      const remaining = getInvestmentRemaining(item);
+      const completed = isInvestmentCompleted(item);
+      return <article className={`investment-card ${completed ? 'completed' : ''}`} key={item.id}>
+        <header className="investment-card__header">
+          <span className="asset-monogram">{item.group.slice(0, 2).toLocaleUpperCase('tr-TR')}</span>
+          <div><b>{item.name || INVESTMENT_GROUP_LABELS[item.group]}</b><small>{INVESTMENT_GROUP_LABELS[item.group]}</small></div>
+        </header>
+        <div className="investment-card__amounts">
+          <div><span>Planlanan</span><b>{formatCurrency(item.plannedAmount)}</b></div>
+          <div><span>Yatırılan</span><b>{formatCurrency(item.actualAmount)}</b></div>
+        </div>
+        <div className="investment-card__progress">
+          <Progress value={Math.min(100, progress)} tone={completed ? 'gold' : progress >= 50 ? 'green' : 'clay'} />
+          <div className="investment-card__progress-info">
+            <strong>%{Math.round(progress)}</strong>
+            <small>{completed ? 'Tamamlandı' : remaining > 0 ? `${formatCurrency(remaining)} kaldı` : ''}</small>
+          </div>
+        </div>
+        <div className="investment-card__actions">
+          <button className="delete-button" onClick={() => openEditInvestment(item)} aria-label="Yatırımı düzenle"><Icon name="edit" /></button>
+          <button className="delete-button" onClick={() => openDeleteConfirm(item)} aria-label="Yatırımı sil"><Icon name="trash" /></button>
+        </div>
+      </article>;
+    })}</section>}
 
     {investForm.isOpen && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setInvestForm({ isOpen: false, mode: 'add' }); }}>
       <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="invest-title" ref={investSheetRef} style={{ maxHeight: sheetMaxHeight }}>
         <div className="sheet__handle" />
-        <header className="sheet__header"><div><span className="eyebrow">YATIRIM</span><h2 id="invest-title">Yeni yatırım planı</h2></div><button className="icon-button" onClick={() => setInvestForm({ isOpen: false, mode: 'add' })} aria-label="Kapat"><Icon name="close" /></button></header>
-        <label className="field">Tür<select value={investGroup} onChange={e => setInvestGroup(e.target.value)}>{INVESTMENT_GROUPS.map(g => <option key={g} value={g}>{INVESTMENT_GROUP_LABELS[g]}</option>)}</select></label>
+        <header className="sheet__header"><div><span className="eyebrow">YATIRIM</span><h2 id="invest-title">{investForm.mode === 'add' ? 'Yeni yatırım planı' : 'Yatırımı düzenle'}</h2></div><button className="icon-button" onClick={() => setInvestForm({ isOpen: false, mode: 'add' })} aria-label="Kapat"><Icon name="close" /></button></header>
+        <label className="field">Tür<select value={investGroup} onChange={e => setInvestGroup(e.target.value as InvestmentGroup)}>{INVESTMENT_GROUPS.map(g => <option key={g} value={g}>{INVESTMENT_GROUP_LABELS[g]}</option>)}</select></label>
+        <label className="field">Ad<input value={investName} onChange={e => { setInvestName(e.target.value); setInvestError(''); }} placeholder="Örn: Acil Yatırım Fonu (TP2)" /></label>
         <label className="amount-input"><span>Planlanan tutar</span><div><input autoFocus inputMode="decimal" value={investPlanned} onChange={e => { setInvestPlanned(e.target.value.replace(/[^0-9.]/g, '')); setInvestError(''); }} placeholder="0" aria-label="Planlanan tutar" /><b>TL</b></div></label>
-        <label className="amount-input"><span>Gerçekleşen tutar</span><div><input inputMode="decimal" value={investActual} onChange={e => { setInvestActual(e.target.value.replace(/[^0-9.]/g, '')); setInvestError(''); }} placeholder="0" aria-label="Gerçekleşen tutar" /><b>TL</b></div></label>
+        <label className="amount-input"><span>Yatırılan tutar</span><div><input inputMode="decimal" value={investActual} onChange={e => { setInvestActual(e.target.value.replace(/[^0-9.]/g, '')); setInvestError(''); }} placeholder="0" aria-label="Yatırılan tutar" /><b>TL</b></div></label>
         {investError && <p className="form-error">{investError}</p>}
-        <button className="primary-button" onClick={saveInvestment}>Yatırımı kaydet</button>
+        <button className="primary-button" onClick={saveInvestment}>{investForm.mode === 'add' ? 'Yatırım planı ekle' : 'Güncelle'}</button>
+      </section>
+    </div>}
+
+    {deleteConfirm.isOpen && deleteConfirm.investment && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setDeleteConfirm({ isOpen: false }); }}>
+      <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="delete-invest-title" ref={deleteSheetRef} style={{ maxHeight: sheetMaxHeight }}>
+        <div className="sheet__handle" />
+        <header className="sheet__header"><div><span className="eyebrow">YATIRIM SİL</span><h2 id="delete-invest-title">Yatırımı sil</h2></div><button className="icon-button" onClick={() => setDeleteConfirm({ isOpen: false })} aria-label="Kapat"><Icon name="close" /></button></header>
+        <p className="delete-confirm-text"><b>{deleteConfirm.investment.name || INVESTMENT_GROUP_LABELS[deleteConfirm.investment.group]}</b> yatırım planını silmek istediğine emin misin? Bu işlem geri alınamaz.</p>
+        <div className="delete-confirm-actions">
+          <button className="secondary-button" onClick={() => setDeleteConfirm({ isOpen: false })}>İptal</button>
+          <button className="primary-button primary-button--danger" onClick={confirmDelete}>Evet, sil</button>
+        </div>
       </section>
     </div>}
   </div>;

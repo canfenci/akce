@@ -324,7 +324,7 @@ describe('Budget form validation', () => {
 
   it('reducer handles ADD_INVESTMENT action', () => {
     const state = seedData;
-    const newInvestment = { id: 'inv-new', group: 'TEFAS' as const, plannedAmount: 5000, actualAmount: 0, completed: false, monthKey: '2026-09', createdAt: Date.now(), updatedAt: Date.now(), userId: 'local-user' };
+    const newInvestment = { id: 'inv-new', group: 'TEFAS' as const, name: 'Yeni Fon', plannedAmount: 5000, actualAmount: 0, completed: false, monthKey: '2026-09', createdAt: Date.now(), updatedAt: Date.now(), userId: 'local-user' };
     const next = reducer(state, { type: 'ADD_INVESTMENT', payload: newInvestment });
     expect(next.investments.some(i => i.id === 'inv-new')).toBe(true);
     expect(next.investments.find(i => i.id === 'inv-new')?.plannedAmount).toBe(5000);
@@ -332,7 +332,7 @@ describe('Budget form validation', () => {
 
   it('investment create maps to investment.create Firestore mutation', async () => {
     const { mapActionToMutation } = await import('../../store/AkceStore');
-    const investment = { id: 'inv-1', group: 'Altın' as const, plannedAmount: 3000, actualAmount: 0, completed: false, monthKey: '2026-09', createdAt: 1, updatedAt: 1, userId: 'u' };
+    const investment = { id: 'inv-1', group: 'Altın' as const, name: 'Gram Altın', plannedAmount: 3000, actualAmount: 0, completed: false, monthKey: '2026-09', createdAt: 1, updatedAt: 1, userId: 'u' };
     const mutation = mapActionToMutation({ type: 'ADD_INVESTMENT', payload: investment }, seedData);
     expect(mutation).toEqual({ type: 'investment.create', value: investment });
   });
@@ -340,10 +340,85 @@ describe('Budget form validation', () => {
   it('ADD_INVESTMENT prepends to investments array', () => {
     const state = seedData;
     const beforeLength = state.investments.length;
-    const newInv = { id: 'inv-first', group: 'BES' as const, plannedAmount: 1000, actualAmount: 0, completed: false, monthKey: '2026-09', createdAt: 1, updatedAt: 1, userId: 'u' };
+    const newInv = { id: 'inv-first', group: 'BES' as const, name: 'BES Fonu', plannedAmount: 1000, actualAmount: 0, completed: false, monthKey: '2026-09', createdAt: 1, updatedAt: 1, userId: 'u' };
     const next = reducer(state, { type: 'ADD_INVESTMENT', payload: newInv });
     expect(next.investments.length).toBe(beforeLength + 1);
     expect(next.investments[0].id).toBe('inv-first');
+  });
+
+  it('UPDATE_INVESTMENT updates existing investment', () => {
+    const state = seedData;
+    const inv = state.investments[0];
+    if (!inv) return;
+    const updated = { ...inv, name: 'Yeni İsim', plannedAmount: 15000, actualAmount: 10000 };
+    const next = reducer(state, { type: 'UPDATE_INVESTMENT', payload: updated });
+    const found = next.investments.find(i => i.id === inv.id);
+    expect(found?.name).toBe('Yeni İsim');
+    expect(found?.plannedAmount).toBe(15000);
+    expect(found?.actualAmount).toBe(10000);
+  });
+
+  it('DELETE_INVESTMENT removes investment', () => {
+    const state = seedData;
+    const invId = state.investments[0]?.id;
+    if (!invId) return;
+    const next = reducer(state, { type: 'DELETE_INVESTMENT', id: invId });
+    expect(next.investments.some(i => i.id === invId)).toBe(false);
+  });
+
+  it('UPDATE_INVESTMENT maps to investment.update mutation', async () => {
+    const { mapActionToMutation } = await import('../../store/AkceStore');
+    const inv = seedData.investments[0];
+    if (!inv) return;
+    const updated = { ...inv, name: 'Güncellenmiş', plannedAmount: 12000 };
+    const mutation = mapActionToMutation({ type: 'UPDATE_INVESTMENT', payload: updated }, seedData);
+    expect(mutation).toEqual({ type: 'investment.update', value: updated });
+  });
+
+  it('DELETE_INVESTMENT maps to investment.delete mutation', async () => {
+    const { mapActionToMutation } = await import('../../store/AkceStore');
+    const invId = seedData.investments[0]?.id;
+    if (!invId) return;
+    const mutation = mapActionToMutation({ type: 'DELETE_INVESTMENT', id: invId }, seedData);
+    expect(mutation).toEqual({ type: 'investment.delete', monthKey: seedData.investments[0].monthKey, id: invId });
+  });
+
+  it('investment progress calculation in UI', () => {
+    const inv = { plannedAmount: 7500, actualAmount: 5000 };
+    const progress = inv.plannedAmount > 0 ? (inv.actualAmount / inv.plannedAmount) * 100 : 0;
+    expect(progress).toBeCloseTo(66.67, 1);
+  });
+
+  it('investment remaining amount calculation', () => {
+    const inv = { plannedAmount: 7500, actualAmount: 5000 };
+    const remaining = Math.max(0, inv.plannedAmount - inv.actualAmount);
+    expect(remaining).toBe(2500);
+  });
+
+  it('investment over-completion: remaining is 0', () => {
+    const inv = { plannedAmount: 5000, actualAmount: 9000 };
+    const remaining = Math.max(0, inv.plannedAmount - inv.actualAmount);
+    expect(remaining).toBe(0);
+  });
+
+  it('investment derived completion', () => {
+    const completed = { plannedAmount: 7500, actualAmount: 7500 };
+    expect(completed.plannedAmount > 0 && completed.actualAmount >= completed.plannedAmount).toBe(true);
+    const notCompleted = { plannedAmount: 7500, actualAmount: 5000 };
+    expect(notCompleted.plannedAmount > 0 && notCompleted.actualAmount >= notCompleted.plannedAmount).toBe(false);
+  });
+
+  it('investment group enum has all required values', async () => {
+    const { INVESTMENT_GROUPS, INVESTMENT_GROUP_LABELS } = await import('../../domain/types');
+    expect(INVESTMENT_GROUPS).toContain('TEFAS');
+    expect(INVESTMENT_GROUPS).toContain('ABD Hisse / ETF');
+    expect(INVESTMENT_GROUPS).toContain('Altın');
+    expect(INVESTMENT_GROUPS).toContain('BES');
+    expect(INVESTMENT_GROUPS).toContain('Kripto');
+    expect(INVESTMENT_GROUPS).toContain('Mevduat');
+    expect(INVESTMENT_GROUP_LABELS['TEFAS']).toBe('TEFAS / Fon');
+    expect(INVESTMENT_GROUP_LABELS['ABD Hisse / ETF']).toBe('ABD Hisse / ETF');
+    expect(INVESTMENT_GROUPS).not.toContain('Nakit');
   });
 });
 

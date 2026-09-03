@@ -11,7 +11,10 @@ import {
   formatRatio,
   getAssetProgress,
   getTotalAssets,
-  getTotalAssetTargets
+  getTotalAssetTargets,
+  getInvestmentProgress,
+  getInvestmentRemaining,
+  isInvestmentCompleted
 } from '../financeEngine';
 import { Expense, Income, FixedExpense, Investment, Asset, AssetGroup } from '../types';
 
@@ -59,7 +62,7 @@ describe('Finance Engine', () => {
       ];
       
       const investments: Investment[] = [
-        { id: '1', group: 'TEFAS', plannedAmount: 5000, actualAmount: 0, completed: false, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
+        { id: '1', group: 'TEFAS', name: 'TEFAS Fonu', plannedAmount: 5000, actualAmount: 0, completed: false, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
       ];
       
       const expenses: Expense[] = [
@@ -91,7 +94,7 @@ describe('Finance Engine', () => {
       const fixedExpenses: FixedExpense[] = [];
       
       const investments: Investment[] = [
-        { id: '1', group: 'TEFAS', plannedAmount: 10000, actualAmount: 0, completed: false, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
+        { id: '1', group: 'TEFAS', name: 'TEFAS Fonu', plannedAmount: 10000, actualAmount: 0, completed: false, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
       ];
       
       const expenses: Expense[] = [];
@@ -408,7 +411,7 @@ expect(summary.sevenDayAverage).toBe(1500);
       { id: '1', name: 'Kira', amount: 26000, dueDay: 1, category: 'Konut', frequency: 'monthly', active: true, monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' }
     ];
     const investments: Investment[] = [
-      { id: '1', group: 'TEFAS', plannedAmount: 30000, actualAmount: 30000, completed: true, monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' }
+      { id: '1', group: 'TEFAS', name: 'TEFAS Fonu', plannedAmount: 30000, actualAmount: 30000, completed: true, monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' }
     ];
 
     it('normal day: divides remaining budget by days left', () => {
@@ -563,6 +566,103 @@ expect(summary.sevenDayAverage).toBe(1500);
     it('asset group enum includes new values', () => {
       const groups: AssetGroup[] = ['TEFAS', 'Nasdaq', 'Altın', 'Gümüş', 'BES', 'Nakit', 'Mevduat', 'Kripto', 'Diğer', 'BIST Hisse', 'Döviz', 'Eurobond / Tahvil'];
       expect(groups.length).toBe(12);
+    });
+  });
+
+  describe('AKCE-035: investment plan progress model', () => {
+    const common = { createdAt: 1, updatedAt: 1, userId: 'u' };
+
+    it('getInvestmentProgress below 100', () => {
+      const inv: Investment = { id: 'i1', group: 'TEFAS', name: 'TP2', plannedAmount: 7500, actualAmount: 5000, completed: false, monthKey: '2024-01', ...common };
+      expect(getInvestmentProgress(inv)).toBeCloseTo(66.67, 1);
+    });
+
+    it('getInvestmentProgress at 100', () => {
+      const inv: Investment = { id: 'i1', group: 'TEFAS', name: 'TP2', plannedAmount: 7500, actualAmount: 7500, completed: true, monthKey: '2024-01', ...common };
+      expect(getInvestmentProgress(inv)).toBe(100);
+    });
+
+    it('getInvestmentProgress above 100 (not clamped)', () => {
+      const inv: Investment = { id: 'i1', group: 'Altın', name: 'Gram Altın', plannedAmount: 5000, actualAmount: 9000, completed: true, monthKey: '2024-01', ...common };
+      expect(getInvestmentProgress(inv)).toBe(180);
+    });
+
+    it('getInvestmentProgress with zero planned', () => {
+      const inv: Investment = { id: 'i1', group: 'TEFAS', name: 'TP2', plannedAmount: 0, actualAmount: 0, completed: false, monthKey: '2024-01', ...common };
+      expect(getInvestmentProgress(inv)).toBe(0);
+    });
+
+    it('getInvestmentRemaining normal', () => {
+      const inv: Investment = { id: 'i1', group: 'TEFAS', name: 'TP2', plannedAmount: 7500, actualAmount: 5000, completed: false, monthKey: '2024-01', ...common };
+      expect(getInvestmentRemaining(inv)).toBe(2500);
+    });
+
+    it('getInvestmentRemaining when over-completed', () => {
+      const inv: Investment = { id: 'i1', group: 'Altın', name: 'Gram Altın', plannedAmount: 5000, actualAmount: 9000, completed: true, monthKey: '2024-01', ...common };
+      expect(getInvestmentRemaining(inv)).toBe(0);
+    });
+
+    it('getInvestmentRemaining at exact planned', () => {
+      const inv: Investment = { id: 'i1', group: 'TEFAS', name: 'TP2', plannedAmount: 7500, actualAmount: 7500, completed: true, monthKey: '2024-01', ...common };
+      expect(getInvestmentRemaining(inv)).toBe(0);
+    });
+
+    it('isInvestmentCompleted derived from amounts', () => {
+      const completed: Investment = { id: 'i1', group: 'TEFAS', name: 'TP2', plannedAmount: 7500, actualAmount: 7500, completed: false, monthKey: '2024-01', ...common };
+      expect(isInvestmentCompleted(completed)).toBe(true);
+    });
+
+    it('isInvestmentCompleted false when under target', () => {
+      const inv: Investment = { id: 'i1', group: 'TEFAS', name: 'TP2', plannedAmount: 7500, actualAmount: 5000, completed: false, monthKey: '2024-01', ...common };
+      expect(isInvestmentCompleted(inv)).toBe(false);
+    });
+
+    it('isInvestmentCompleted true when over target', () => {
+      const inv: Investment = { id: 'i1', group: 'Altın', name: 'Gram Altın', plannedAmount: 5000, actualAmount: 9000, completed: true, monthKey: '2024-01', ...common };
+      expect(isInvestmentCompleted(inv)).toBe(true);
+    });
+
+    it('investmentPlanRealizationRate uses actualAmount not completed flag', () => {
+      const incomes: Income[] = [
+        { id: '1', name: 'Maaş', amount: 100000, date: '2024-01-01', recurring: true, active: true, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'u' }
+      ];
+      const investments: Investment[] = [
+        { id: '1', group: 'TEFAS', name: 'TP2', plannedAmount: 7500, actualAmount: 5000, completed: false, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'u' },
+        { id: '2', group: 'Altın', name: 'Gram Altın', plannedAmount: 5000, actualAmount: 5000, completed: true, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'u' },
+        { id: '3', group: 'ABD Hisse / ETF', name: 'VOO', plannedAmount: 7500, actualAmount: 2500, completed: false, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'u' },
+      ];
+      const summary = calculateMonthSummary(incomes, [], investments, [], [], new Date('2024-01-15'));
+      // totalFixedInvestment = 7500 + 5000 + 7500 = 20000
+      // actualInvestments = 5000 + 5000 + 2500 = 12500
+      // rate = 12500 / 20000 * 100 = 62.5%
+      expect(summary.totalFixedInvestment).toBe(20000);
+      expect(summary.investmentPlanRealizationRate).toBeCloseTo(62.5, 1);
+    });
+
+    it('remainingBudget uses plannedAmount not actualAmount', () => {
+      const incomes: Income[] = [
+        { id: '1', name: 'Maaş', amount: 100000, date: '2024-01-01', recurring: true, active: true, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'u' }
+      ];
+      const investments: Investment[] = [
+        { id: '1', group: 'TEFAS', name: 'TP2', plannedAmount: 20000, actualAmount: 15000, completed: false, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'u' },
+      ];
+      const summary = calculateMonthSummary(incomes, [], investments, [], [], new Date('2024-01-15'));
+      // remainingBudget = 100000 - 20000 (planned) = 80000
+      expect(summary.remainingBudget).toBe(80000);
+    });
+
+    it('aggregate progress for multiple investments', () => {
+      const investments: Investment[] = [
+        { id: '1', group: 'TEFAS', name: 'TP2', plannedAmount: 7500, actualAmount: 7500, completed: true, monthKey: '2024-01', ...common },
+        { id: '2', group: 'Altın', name: 'Gram Altın', plannedAmount: 5000, actualAmount: 5000, completed: true, monthKey: '2024-01', ...common },
+        { id: '3', group: 'ABD Hisse / ETF', name: 'VOO', plannedAmount: 7500, actualAmount: 2500, completed: false, monthKey: '2024-01', ...common },
+      ];
+      const totalPlanned = investments.reduce((s, i) => s + i.plannedAmount, 0);
+      const totalActual = investments.reduce((s, i) => s + i.actualAmount, 0);
+      expect(totalPlanned).toBe(20000);
+      expect(totalActual).toBe(15000);
+      const progress = totalPlanned > 0 ? (totalActual / totalPlanned) * 100 : 0;
+      expect(progress).toBe(75);
     });
   });
 });

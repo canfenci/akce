@@ -39,9 +39,28 @@ export interface FixedExpense {
   userId: string;
 }
 
+export type InvestmentGroup = 'TEFAS' | 'BIST Hisse' | 'ABD Hisse / ETF' | 'Altın' | 'Gümüş' | 'Döviz' | 'BES' | 'Eurobond / Tahvil' | 'Kripto' | 'Mevduat' | 'Diğer';
+
+export const INVESTMENT_GROUPS: InvestmentGroup[] = ['TEFAS', 'BIST Hisse', 'ABD Hisse / ETF', 'Altın', 'Gümüş', 'Döviz', 'BES', 'Eurobond / Tahvil', 'Kripto', 'Mevduat', 'Diğer'];
+
+export const INVESTMENT_GROUP_LABELS: Record<InvestmentGroup, string> = {
+  TEFAS: 'TEFAS / Fon',
+  'BIST Hisse': 'BIST Hisse',
+  'ABD Hisse / ETF': 'ABD Hisse / ETF',
+  Altın: 'Altın',
+  Gümüş: 'Gümüş',
+  Döviz: 'Döviz',
+  BES: 'BES',
+  'Eurobond / Tahvil': 'Eurobond / Tahvil',
+  Kripto: 'Kripto',
+  Mevduat: 'Mevduat',
+  Diğer: 'Diğer',
+};
+
 export interface Investment {
   id: string;
-  group: 'TEFAS' | 'Nasdaq' | 'Altın' | 'Gümüş' | 'BES';
+  group: InvestmentGroup;
+  name: string;
   plannedAmount: number;
   actualAmount: number;
   completed: boolean;

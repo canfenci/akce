@@ -21,6 +21,8 @@ export type Action =
   | { type: 'ADD_ASSET'; payload: Asset }
   | { type: 'DELETE_ASSET'; id: string }
   | { type: 'ADD_INVESTMENT'; payload: Investment }
+  | { type: 'UPDATE_INVESTMENT'; payload: Investment }
+  | { type: 'DELETE_INVESTMENT'; id: string }
   | { type: 'ADD_FIXED_EXPENSE'; payload: FixedExpense }
   | { type: 'UPDATE_FIXED_EXPENSE'; payload: FixedExpense }
   | { type: 'DELETE_FIXED_EXPENSE'; id: string }
@@ -95,6 +97,8 @@ export function reducer(state: AkceData, action: Action): AkceData {
     case 'ADD_ASSET': return { ...state, assets: [action.payload, ...state.assets] };
     case 'DELETE_ASSET': return { ...state, assets: state.assets.filter(item => item.id !== action.id) };
     case 'ADD_INVESTMENT': return { ...state, investments: [action.payload, ...state.investments] };
+    case 'UPDATE_INVESTMENT': return { ...state, investments: state.investments.map(item => item.id === action.payload.id ? action.payload : item) };
+    case 'DELETE_INVESTMENT': return { ...state, investments: state.investments.filter(item => item.id !== action.id) };
     case 'SET_ONBOARDING': return { ...state, settings: { ...state.settings, showOnboarding: action.value, updatedAt: Date.now() } };
     case 'RESET': return { ...seedData, settings: { ...seedData.settings, showOnboarding: false } };
     case 'RESET_FINANCE_DATA': return { ...emptyFinanceState, selectedMonthKey: state.selectedMonthKey };
@@ -178,6 +182,11 @@ export function mapActionToMutation(action: Action, currentState: AkceData): Fin
     case 'ADD_ASSET': return { type: 'asset.create', value: action.payload };
     case 'DELETE_ASSET': return { type: 'asset.delete', id: action.id };
     case 'ADD_INVESTMENT': return { type: 'investment.create', value: action.payload };
+    case 'UPDATE_INVESTMENT': return { type: 'investment.update', value: action.payload };
+    case 'DELETE_INVESTMENT': {
+      const item = currentState.investments.find(i => i.id === action.id);
+      return item ? { type: 'investment.delete', monthKey: item.monthKey, id: item.id } : null;
+    }
     case 'INITIALIZE_MONTH': {
       const nextState = initializeMonth(currentState, action.sourceMonthKey, action.targetMonthKey);
       return {

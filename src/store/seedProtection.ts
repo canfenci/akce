@@ -15,11 +15,11 @@ const SEED_TEMPLATES: {
     'fixed-3': { name: 'Abonelikler', amount: 5000, dueDay: 18, category: 'Abonelik' },
   },
   investments: {
-    'inv-1': { group: 'TEFAS', plannedAmount: 9000 },
-    'inv-2': { group: 'Nasdaq', plannedAmount: 5500 },
-    'inv-3': { group: 'Altın', plannedAmount: 3500 },
-    'inv-4': { group: 'Gümüş', plannedAmount: 1500 },
-    'inv-5': { group: 'BES', plannedAmount: 3000 },
+    'inv-1': { group: 'TEFAS', name: 'Acil Yatırım Fonu', plannedAmount: 9000 },
+    'inv-2': { group: 'ABD Hisse / ETF', name: 'VOO', plannedAmount: 5500 },
+    'inv-3': { group: 'Altın', name: 'Gram Altın', plannedAmount: 3500 },
+    'inv-4': { group: 'Gümüş', name: 'Gümüş Fonu', plannedAmount: 1500 },
+    'inv-5': { group: 'BES', name: 'Allianz BES', plannedAmount: 3000 },
   },
   expenses: {
     'expense-1': { amount: 2650, category: 'Market' },

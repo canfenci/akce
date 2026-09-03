@@ -203,4 +203,48 @@ describe('Firestore finance repository', () => {
       }
     });
   });
+
+  describe('AKCE-035: investment DTO round-trip and group mapping', () => {
+    const uid = 'user-1';
+    const deviceId = 'device-1';
+    const timestamp = { server: true };
+
+    it('investment with new group and name round-trips through DTO', () => {
+      const investment = { id: 'inv-1', group: 'ABD Hisse / ETF' as const, name: 'VOO', plannedAmount: 7500, actualAmount: 5000, completed: false, monthKey: '2026-09', createdAt: 1, updatedAt: 1, userId: uid };
+      const dto = toFirestoreDto(investment, deviceId, timestamp);
+      const domain = fromFirestoreDto('investments', 'inv-1', uid, dto as Record<string, unknown>);
+      expect(domain.group).toBe('ABD Hisse / ETF');
+      expect(domain.name).toBe('VOO');
+      expect(domain.plannedAmount).toBe(7500);
+      expect(domain.actualAmount).toBe(5000);
+    });
+
+    it('legacy Nasdaq group maps to ABD Hisse / ETF', () => {
+      const oldDto = { group: 'Nasdaq', name: 'VOO', plannedAmount: 7500, actualAmount: 5000, completed: false, monthKey: '2026-09', schemaVersion: 2, deviceId: 'old', createdAt: 1, updatedAt: 1, serverUpdatedAt: timestamp };
+      const domain = fromFirestoreDto('investments', 'inv-1', uid, oldDto);
+      expect(domain.group).toBe('ABD Hisse / ETF');
+    });
+
+    it('legacy investment without name falls back to empty string', () => {
+      const oldDto = { group: 'TEFAS', plannedAmount: 9000, actualAmount: 9000, completed: true, monthKey: '2026-09', schemaVersion: 2, deviceId: 'old', createdAt: 1, updatedAt: 1, serverUpdatedAt: timestamp };
+      const domain = fromFirestoreDto('investments', 'inv-1', uid, oldDto);
+      expect(domain.name).toBe('');
+    });
+
+    it('all new investment group enum values are accepted', () => {
+      const groups = ['TEFAS', 'BIST Hisse', 'ABD Hisse / ETF', 'Altın', 'Gümüş', 'Döviz', 'BES', 'Eurobond / Tahvil', 'Kripto', 'Mevduat', 'Diğer'] as const;
+      for (const group of groups) {
+        const investment = { id: 'inv-1', group, name: 'Test', plannedAmount: 1000, actualAmount: 500, completed: false, monthKey: '2026-09', createdAt: 1, updatedAt: 1, userId: uid };
+        const dto = toFirestoreDto(investment, deviceId, timestamp);
+        const domain = fromFirestoreDto('investments', 'inv-1', uid, dto as Record<string, unknown>);
+        expect(domain.group).toBe(group);
+      }
+    });
+
+    it('investment delete mutation creates correct delete path', async () => {
+      const { gateway, repository } = createRepository();
+      await repository.applyMutation(uid, { type: 'investment.delete', monthKey: '2026-09', id: 'inv-1' });
+      expect(gateway.deletes).toEqual([monthlyDocumentPath(uid, '2026-09', 'investments', 'inv-1')]);
+    });
+  });
 });

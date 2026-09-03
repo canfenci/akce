@@ -124,8 +124,10 @@ service cloud.firestore {
           allow write: if isOwner(uid)
             && validMonthKey(monthKey)
             && validSchemaVersion()
-            && validNumber(request.resource.data.plannedAmount, 0)
-            && validNumber(request.resource.data.actualAmount, 0);
+            && validString(request.resource.data.name, 1, 100)
+            && validNumber(request.resource.data.plannedAmount, 0.01)
+            && validNumber(request.resource.data.actualAmount, 0)
+            && (request.resource.data.group in ['TEFAS', 'BIST Hisse', 'ABD Hisse / ETF', 'Altın', 'Gümüş', 'Döviz', 'BES', 'Eurobond / Tahvil', 'Kripto', 'Mevduat', 'Diğer']);
           allow delete: if isOwner(uid);
         }
 
