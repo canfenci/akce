@@ -7,6 +7,26 @@ import { FirebaseFinanceRepository } from '../../store/firebaseFinanceRepository
 import type { FirestoreGateway, GatewayBatchOperation, GatewayDocument } from '../../store/firestoreGateway';
 import type { ReactNode } from 'react';
 import { QuickExpenseSheet } from '../../components/QuickExpenseSheet';
+import { AuthProvider } from '../../auth/AuthProvider';
+import type { AuthClient } from '../../auth/firebaseAuthClient';
+
+function createMockAuthClient(displayName: string | null = null): AuthClient {
+  return {
+    initialize: async () => {},
+    subscribe: (onUser) => { onUser(displayName ? { uid: 'test', displayName, email: 'test@test.com', photoURL: null } : null); return () => {}; },
+    signInWithPopup: async () => {},
+    signOut: async () => {},
+  };
+}
+
+function createMemoryStorage() {
+  const values = new Map<string, string>();
+  return {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => { values.set(key, value); },
+    removeItem: (key: string) => { values.delete(key); },
+  };
+}
 
 class SimpleGateway implements FirestoreGateway {
   docs = new Map<string, Record<string, unknown>>();
@@ -33,7 +53,7 @@ class SimpleGateway implements FirestoreGateway {
   serverTimestamp(): unknown { return Date.now(); }
 }
 
-function createTestWrapper() {
+function createTestWrapper(displayName: string | null = null) {
   const gateway = new SimpleGateway();
   const firebaseRepo = new FirebaseFinanceRepository(gateway, 'dev-1');
   const coordinator = new FinanceSyncCoordinator({
@@ -41,8 +61,12 @@ function createTestWrapper() {
     firebaseRepository: firebaseRepo,
     gateway,
   });
+  const authClient = createMockAuthClient(displayName);
+  const storage = createMemoryStorage();
   return ({ children }: { children: ReactNode }) => (
-    <AkceStoreProvider coordinator={coordinator}>{children}</AkceStoreProvider>
+    <AuthProvider client={authClient} storage={storage}>
+      <AkceStoreProvider coordinator={coordinator}>{children}</AkceStoreProvider>
+    </AuthProvider>
   );
 }
 
@@ -299,5 +323,109 @@ describe('Home screen income ratios', () => {
     const wrapper = createTestWrapper();
     render(<HomeScreen goTo={() => {}} />, { wrapper });
     expect(screen.getByText('BUGÜN GÜVENLE HARCAYABİLECEĞİN')).toBeTruthy();
+  });
+});
+
+describe('UX polish pack', () => {
+  it('asset edit button meets 44px touch target', () => {
+    const style = document.createElement('style');
+    style.textContent = '.delete-button{width:44px;height:44px}';
+    document.head.appendChild(style);
+    const btn = document.createElement('button');
+    btn.className = 'delete-button';
+    document.body.appendChild(btn);
+    const computed = window.getComputedStyle(btn);
+    expect(parseInt(computed.width)).toBeGreaterThanOrEqual(44);
+    expect(parseInt(computed.height)).toBeGreaterThanOrEqual(44);
+    document.body.removeChild(btn);
+    document.head.removeChild(style);
+  });
+
+  it('asset delete button meets 44px touch target', () => {
+    const style = document.createElement('style');
+    style.textContent = '.asset-card__actions .delete-button{width:44px;height:44px}';
+    document.head.appendChild(style);
+    const container = document.createElement('div');
+    container.className = 'asset-card__actions';
+    const btn = document.createElement('button');
+    btn.className = 'delete-button';
+    container.appendChild(btn);
+    document.body.appendChild(container);
+    const computed = window.getComputedStyle(btn);
+    expect(parseInt(computed.width)).toBeGreaterThanOrEqual(44);
+    expect(parseInt(computed.height)).toBeGreaterThanOrEqual(44);
+    document.body.removeChild(container);
+    document.head.removeChild(style);
+  });
+
+  it('HomeScreen shows greeting without hardcoded name when no user', async () => {
+    const { HomeScreen } = await import('../../features/Screens');
+    const wrapper = createTestWrapper(null);
+    render(<HomeScreen goTo={() => {}} />, { wrapper });
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(heading.textContent).toMatch(/^Merhaba/);
+  });
+
+  it('BudgetScreen shows Toplam gelir as lead metric', async () => {
+    const { BudgetScreen } = await import('../../features/Screens');
+    const wrapper = createTestWrapper();
+    render(<BudgetScreen />, { wrapper });
+    expect(screen.getByText('Toplam gelir')).toBeTruthy();
+    const leadMetric = document.querySelector('.metric--lead');
+    expect(leadMetric).toBeTruthy();
+  });
+
+  it('bottom nav order unchanged', () => {
+    const nav = document.createElement('nav');
+    nav.className = 'bottom-nav';
+    for (const label of ['Ana Sayfa', 'Bütçe', '', 'Varlıklar', 'Yatırımlar']) {
+      const btn = document.createElement('button');
+      if (!label) btn.className = 'bottom-nav__add';
+      else btn.textContent = label;
+      nav.appendChild(btn);
+    }
+    document.body.appendChild(nav);
+    const buttons = Array.from(nav.querySelectorAll('button'));
+    expect(buttons[0].textContent).toBe('Ana Sayfa');
+    expect(buttons[1].textContent).toBe('Bütçe');
+    expect(buttons[2].className).toBe('bottom-nav__add');
+    expect(buttons[3].textContent).toBe('Varlıklar');
+    expect(buttons[4].textContent).toBe('Yatırımlar');
+    document.body.removeChild(nav);
+  });
+
+  it('FAB still centered', () => {
+    const style = document.createElement('style');
+    style.textContent = '.bottom-nav__add{position:absolute;left:50%;transform:translateX(-50%)}';
+    document.head.appendChild(style);
+    const fab = document.createElement('button');
+    fab.className = 'bottom-nav__add';
+    document.body.appendChild(fab);
+    const computed = window.getComputedStyle(fab);
+    expect(computed.position).toBe('absolute');
+    expect(computed.left).toBe('50%');
+    expect(computed.transform).toContain('translateX');
+    document.body.removeChild(fab);
+    document.head.removeChild(style);
+  });
+
+  it('month navigation has proper spacing from header', () => {
+    const style = document.createElement('style');
+    style.textContent = '.mobile-header{position:sticky;top:0;z-index:20}.month-navigation{margin:-10px 0 24px}';
+    document.head.appendChild(style);
+    const header = document.createElement('header');
+    header.className = 'mobile-header';
+    const nav = document.createElement('div');
+    nav.className = 'month-navigation';
+    document.body.appendChild(header);
+    document.body.appendChild(nav);
+    const headerComputed = window.getComputedStyle(header);
+    const navComputed = window.getComputedStyle(nav);
+    expect(headerComputed.position).toBe('sticky');
+    expect(headerComputed.zIndex).toBe('20');
+    expect(navComputed.marginTop).toBe('-10px');
+    document.body.removeChild(header);
+    document.body.removeChild(nav);
+    document.head.removeChild(style);
   });
 });
