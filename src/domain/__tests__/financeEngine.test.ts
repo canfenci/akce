@@ -394,4 +394,89 @@ expect(summary.sevenDayAverage).toBe(1500);
       expect(formatRatio(0)).toBe('—');
     });
   });
+
+  describe('dailySafeLimit edge cases', () => {
+    const incomes: Income[] = [
+      { id: '1', name: 'Maaş', amount: 100000, date: '2024-09-01', recurring: true, active: true, monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' }
+    ];
+    const fixedExpenses: FixedExpense[] = [
+      { id: '1', name: 'Kira', amount: 26000, dueDay: 1, category: 'Konut', frequency: 'monthly', active: true, monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' }
+    ];
+    const investments: Investment[] = [
+      { id: '1', group: 'TEFAS', plannedAmount: 30000, actualAmount: 30000, completed: true, monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' }
+    ];
+
+    it('normal day: divides remaining budget by days left', () => {
+      const expenses: Expense[] = [
+        { id: '1', amount: 10000, category: 'Market', type: 'zorunlu', paymentMethod: 'kart', date: '2024-09-10', monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' }
+      ];
+      // remainingBudget = 100000 - 30000 - 26000 - 10000 = 34000
+      // daysLeft on Sep 10 = 20
+      const summary = calculateMonthSummary(incomes, fixedExpenses, investments, expenses, [], new Date('2024-09-10'));
+      expect(summary.remainingBudget).toBe(34000);
+      expect(summary.daysLeft).toBe(20);
+      expect(summary.dailySafeLimit).toBe(1700);
+    });
+
+    it('final day / positive remaining: shows full remaining budget', () => {
+      const expenses: Expense[] = [
+        { id: '1', amount: 6000, category: 'Market', type: 'zorunlu', paymentMethod: 'kart', date: '2024-09-30', monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' }
+      ];
+      // remainingBudget = 100000 - 30000 - 26000 - 6000 = 38000
+      const summary = calculateMonthSummary(incomes, fixedExpenses, investments, expenses, [], new Date('2024-09-30'));
+      expect(summary.remainingBudget).toBe(38000);
+      expect(summary.daysLeft).toBe(0);
+      expect(summary.dailySafeLimit).toBe(38000);
+    });
+
+    it('final day / zero remaining: shows 0', () => {
+      const expenses: Expense[] = [
+        { id: '1', amount: 44000, category: 'Market', type: 'zorunlu', paymentMethod: 'kart', date: '2024-09-30', monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' }
+      ];
+      // remainingBudget = 100000 - 30000 - 26000 - 44000 = 0
+      const summary = calculateMonthSummary(incomes, fixedExpenses, investments, expenses, [], new Date('2024-09-30'));
+      expect(summary.remainingBudget).toBe(0);
+      expect(summary.daysLeft).toBe(0);
+      expect(summary.dailySafeLimit).toBe(0);
+    });
+
+    it('final day / negative remaining: shows 0 (over-budget state)', () => {
+      const expenses: Expense[] = [
+        { id: '1', amount: 50000, category: 'Market', type: 'zorunlu', paymentMethod: 'kart', date: '2024-09-30', monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' }
+      ];
+      // remainingBudget = 100000 - 30000 - 26000 - 50000 = -6000
+      const summary = calculateMonthSummary(incomes, fixedExpenses, investments, expenses, [], new Date('2024-09-30'));
+      expect(summary.remainingBudget).toBe(-6000);
+      expect(summary.daysLeft).toBe(0);
+      expect(summary.dailySafeLimit).toBe(0);
+    });
+
+    it('zero income: no NaN or Infinity', () => {
+      const noIncome: Income[] = [];
+      const noFixed: FixedExpense[] = [];
+      const noInvest: Investment[] = [];
+      const noExp: Expense[] = [];
+      const summary = calculateMonthSummary(noIncome, noFixed, noInvest, noExp, [], new Date('2024-09-30'));
+      expect(summary.dailySafeLimit).toBe(0);
+      expect(isNaN(summary.dailySafeLimit)).toBe(false);
+      expect(isFinite(summary.dailySafeLimit)).toBe(true);
+    });
+
+    it('historical month: deterministic behavior', () => {
+      const expenses: Expense[] = [
+        { id: '1', amount: 10000, category: 'Market', type: 'zorunlu', paymentMethod: 'kart', date: '2024-08-15', monthKey: '2024-08', createdAt: 1, updatedAt: 1, userId: 'u' }
+      ];
+      const augIncomes: Income[] = [
+        { id: '1', name: 'Maaş', amount: 80000, date: '2024-08-01', recurring: true, active: true, monthKey: '2024-08', createdAt: 1, updatedAt: 1, userId: 'u' }
+      ];
+      // Aug 31 is the last day of August
+      const summary = calculateMonthSummary(augIncomes, [], [], expenses, [], new Date('2024-08-31'));
+      // remainingBudget = 80000 - 0 - 0 - 10000 = 70000
+      // daysLeft on Aug 31 = 0
+      // dailySafeLimit = 70000 (full remaining, historical month)
+      expect(summary.remainingBudget).toBe(70000);
+      expect(summary.daysLeft).toBe(0);
+      expect(summary.dailySafeLimit).toBe(70000);
+    });
+  });
 });
