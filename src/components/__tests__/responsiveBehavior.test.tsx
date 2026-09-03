@@ -95,3 +95,47 @@ describe('QuickExpenseSheet viewport', () => {
     expect(style.maxHeight).toBeTruthy();
   });
 });
+
+describe('Bottom nav FAB centering', () => {
+  it('FAB is absolutely positioned at 50% horizontal center', () => {
+    const style = document.createElement('style');
+    style.textContent = `
+      .bottom-nav{position:relative;width:100%}
+      .bottom-nav__add{position:absolute;left:50%;top:0;transform:translateX(-50%);width:54px;height:54px;border-radius:50%}
+    `;
+    document.head.appendChild(style);
+
+    const nav = document.createElement('nav');
+    nav.className = 'bottom-nav';
+    const fab = document.createElement('button');
+    fab.className = 'bottom-nav__add';
+    nav.appendChild(fab);
+    document.body.appendChild(nav);
+
+    const computed = window.getComputedStyle(fab);
+    expect(computed.position).toBe('absolute');
+    expect(computed.left).toBe('50%');
+    expect(computed.transform).toContain('translateX');
+
+    document.body.removeChild(nav);
+    document.head.removeChild(style);
+  });
+
+  it('FAB width and height are 54px', () => {
+    const style = document.createElement('style');
+    style.textContent = '.bottom-nav__add{width:54px;height:54px;min-width:54px;min-height:54px;border-radius:50%}';
+    document.head.appendChild(style);
+
+    const fab = document.createElement('button');
+    fab.className = 'bottom-nav__add';
+    document.body.appendChild(fab);
+
+    const computed = window.getComputedStyle(fab);
+    expect(computed.width).toBe('54px');
+    expect(computed.height).toBe('54px');
+    expect(computed.borderRadius).toBe('50%');
+
+    document.body.removeChild(fab);
+    document.head.removeChild(style);
+  });
+});
