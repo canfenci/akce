@@ -14,8 +14,8 @@ interface QuickAddItem {
 const items: QuickAddItem[] = [
   { action: 'expense', icon: 'receipt', title: 'Harcama ekle', subtitle: 'Günlük harcamanı kaydet' },
   { action: 'income', icon: 'wallet', title: 'Gelir ekle', subtitle: 'Yeni gelir ekle' },
-  { action: 'investment', icon: 'chart', title: 'Yatırım ekle', subtitle: 'Aylık yatırım gerçekleşmesini kaydet' },
-  { action: 'asset', icon: 'target', title: 'Varlık ekle', subtitle: 'Portföyüne yeni varlık ekle' },
+  { action: 'investment', icon: 'chart', title: 'Yatırım ekle', subtitle: 'Bu ay ayırdığın yatırım tutarını kaydet' },
+  { action: 'asset', icon: 'target', title: 'Varlık ekle', subtitle: 'Şu an sahip olduğun birikmiş değeri kaydet' },
 ];
 
 export function QuickAddSheet({ open, onClose, onSelect }: {

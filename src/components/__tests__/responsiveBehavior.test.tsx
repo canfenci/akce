@@ -237,8 +237,8 @@ describe('QuickAddSheet', () => {
     render(<QuickAddSheet open={true} onClose={() => {}} onSelect={() => {}} />, { wrapper });
     expect(screen.getByText('Günlük harcamanı kaydet')).toBeTruthy();
     expect(screen.getByText('Yeni gelir ekle')).toBeTruthy();
-    expect(screen.getByText('Aylık yatırım gerçekleşmesini kaydet')).toBeTruthy();
-    expect(screen.getByText('Portföyüne yeni varlık ekle')).toBeTruthy();
+    expect(screen.getByText('Bu ay ayırdığın yatırım tutarını kaydet')).toBeTruthy();
+    expect(screen.getByText('Şu an sahip olduğun birikmiş değeri kaydet')).toBeTruthy();
   });
 
   it('calls onSelect with correct action when clicked', async () => {
@@ -265,5 +265,21 @@ describe('QuickAddSheet', () => {
     render(<QuickAddSheet open={true} onClose={() => {}} onSelect={() => {}} />, { wrapper });
     expect(screen.getByRole('dialog')).toBeTruthy();
     expect(screen.getByLabelText('Hızlı Ekle')).toBeTruthy();
+  });
+});
+
+describe('Investment vs Asset clarity', () => {
+  it('InvestmentsScreen shows correct description', async () => {
+    const { InvestmentsScreen } = await import('../../features/Screens');
+    const wrapper = createTestWrapper();
+    render(<InvestmentsScreen />, { wrapper });
+    expect(screen.getByText('Bu ay yatırım için ayırdığın tutarları takip et. Birikmiş portföy değerini değil, aylık yatırım katkını takip edersin.')).toBeTruthy();
+  });
+
+  it('AssetsScreen shows correct description', async () => {
+    const { AssetsScreen } = await import('../../features/Screens');
+    const wrapper = createTestWrapper();
+    render(<AssetsScreen />, { wrapper });
+    expect(screen.getByText('Birikmiş finansal varlıklarının güncel değerini takip et. Yatırım ekranı aylık katkını, Varlıklar ekranı toplam birikmiş değerini gösterir.')).toBeTruthy();
   });
 });
