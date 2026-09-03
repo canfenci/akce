@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type Dispatch, type ReactNode } from 'react';
 import type { Expense, Income, FixedExpense, CategoryBudget } from '../domain/types';
 import { seedData, type AkceData } from './seed';
-import { localStorageFinanceRepository, storageKey } from './localStorageFinanceRepository';
+import { localStorageFinanceRepository, storageKey, emptyFinanceState } from './localStorageFinanceRepository';
 import { createFirebaseFinanceRepository } from './firebaseFinanceRepository';
 import { createFirestoreGateway } from './firestoreGateway';
 import { FinanceSyncCoordinator, type SyncStatus } from './financeSyncCoordinator';
@@ -29,6 +29,7 @@ export type Action =
   | { type: 'INITIALIZE_MONTH'; sourceMonthKey: string; targetMonthKey: string }
   | { type: 'SET_ONBOARDING'; value: boolean }
   | { type: 'RESET' }
+  | { type: 'RESET_FINANCE_DATA' }
   | { type: 'SYNC_HYDRATE_STATE'; state: AkceData }
   | { type: 'SYNC_SUBSCRIPTION_UPDATE'; update: FinanceSubscriptionUpdate };
 
@@ -90,6 +91,7 @@ export function reducer(state: AkceData, action: Action): AkceData {
     case 'UPDATE_ASSET': return { ...state, assets: state.assets.map(item => item.id === action.id ? { ...item, currentAmount: Math.max(0, action.amount), targetAmount: action.targetAmount !== undefined ? Math.max(0, action.targetAmount) : item.targetAmount, updatedAt: Date.now() } : item) };
     case 'SET_ONBOARDING': return { ...state, settings: { ...state.settings, showOnboarding: action.value, updatedAt: Date.now() } };
     case 'RESET': return { ...seedData, settings: { ...seedData.settings, showOnboarding: false } };
+    case 'RESET_FINANCE_DATA': return { ...emptyFinanceState, selectedMonthKey: state.selectedMonthKey };
     case 'SYNC_HYDRATE_STATE': return action.state;
     case 'SYNC_SUBSCRIPTION_UPDATE': {
       const { collection, items } = action.update;
@@ -111,6 +113,7 @@ interface StoreContextValue {
   state: AkceData;
   dispatch: Dispatch<Action>;
   syncStatus: SyncStatus;
+  resetFinanceData: () => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null);
@@ -268,7 +271,17 @@ export function AkceStoreProvider({
     [coordinator],
   );
 
-  const value = useMemo(() => ({ state, dispatch, syncStatus }), [state, dispatch, syncStatus]);
+  const value = useMemo(() => ({
+    state,
+    dispatch,
+    syncStatus,
+    resetFinanceData: async () => {
+      const uid = auth?.user?.uid;
+      if (!uid) return;
+      await coordinator.resetUserFinanceData(uid);
+      rawDispatch({ type: 'RESET_FINANCE_DATA' });
+    },
+  }), [state, dispatch, syncStatus, coordinator, auth?.user?.uid]);
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
 

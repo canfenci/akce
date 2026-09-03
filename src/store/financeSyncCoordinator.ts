@@ -30,6 +30,7 @@ import {
 import type { FirestoreGateway, GatewayBatchOperation } from './firestoreGateway';
 import { getOrCreateDeviceId } from './firebaseFinanceRepository';
 import { isSeedOnlyState, filterUserRecords } from './seedProtection';
+import { setEmptyStateMarker } from './localStorageFinanceRepository';
 import {
   readMigrationMarker,
   writeMigrationMarker,
@@ -686,6 +687,56 @@ export class FinanceSyncCoordinator {
       this.setStatus('error');
     }
     this.onErrorCallback?.(error);
+  }
+
+  async resetUserFinanceData(uid: string): Promise<void> {
+    const monthlyCollections = ['expenses', 'incomes', 'fixedExpenses', 'investments', 'categoryBudgets'] as const;
+    const globalCollections = ['assets', 'goals', 'assetSnapshots'] as const;
+
+    // 1. Enumerate monthly documents
+    const monthDocs = (await this.gateway.getDocuments?.(`users/${uid}/months`)) ?? [];
+
+    // 2. Delete all subcollection documents in each month
+    for (const mDoc of monthDocs) {
+      const mKey = mDoc.id;
+      for (const col of monthlyCollections) {
+        const colDocs = (await this.gateway.getDocuments?.(monthlyCollectionPath(uid, mKey, col))) ?? [];
+        if (colDocs.length === 0) continue;
+        const ops: GatewayBatchOperation[] = colDocs.map(d => ({ type: 'delete', path: monthlyDocumentPath(uid, mKey, col, d.id) }));
+        await this.commitBatchesInChunks(ops);
+      }
+    }
+
+    // 3. Delete month parent documents
+    if (monthDocs.length > 0) {
+      const monthOps: GatewayBatchOperation[] = monthDocs.map(d => ({ type: 'delete', path: monthPath(uid, d.id) }));
+      await this.commitBatchesInChunks(monthOps);
+    }
+
+    // 4. Delete global collections
+    for (const col of globalCollections) {
+      const colDocs = (await this.gateway.getDocuments?.(globalCollectionPath(uid, col))) ?? [];
+      if (colDocs.length === 0) continue;
+      const ops: GatewayBatchOperation[] = colDocs.map(d => ({ type: 'delete', path: globalDocumentPath(uid, col, d.id) }));
+      await this.commitBatchesInChunks(ops);
+    }
+
+    // 5. Delete migration marker
+    try {
+      await this.gateway.deleteDocument(`users/${uid}/meta/migration`);
+    } catch {
+      // Migration marker may not exist; ignore
+    }
+
+    // 6. Clear local storage finance data
+    this.storage.removeItem?.('akce-v1-state');
+    this.storage.removeItem?.(`akce-v1-backup-${uid}`);
+    setEmptyStateMarker(this.storage);
+
+    // 7. Reset coordinator state
+    this.cleanupListeners();
+    this.activeRepository = this.firebaseRepo;
+    this.setStatus('synced');
   }
 
   cleanupListeners(): void {

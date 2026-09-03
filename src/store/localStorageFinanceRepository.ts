@@ -5,6 +5,19 @@ import { seedData, type AkceData } from './seed';
 import type { LocalFinanceRepository } from './financeRepository';
 
 export const storageKey = 'akce-v1-state';
+const emptyStateKey = 'akce-v1-empty-state';
+
+export function isEmptyStateMarkerSet(storage: Pick<Storage, 'getItem'> = localStorage): boolean {
+  return storage.getItem(emptyStateKey) === '1';
+}
+
+export function setEmptyStateMarker(storage: Pick<Storage, 'setItem'> = localStorage): void {
+  storage.setItem(emptyStateKey, '1');
+}
+
+export function clearEmptyStateMarker(storage: Pick<Storage, 'removeItem'> = localStorage): void {
+  storage.removeItem(emptyStateKey);
+}
 
 type LegacyCategoryBudget = Omit<CategoryBudget, 'monthKey'> & { monthKey?: string };
 type LegacyData = Partial<Omit<AkceData, 'schemaVersion' | 'selectedMonthKey' | 'categoryBudgets'>> & {
@@ -14,6 +27,20 @@ type LegacyData = Partial<Omit<AkceData, 'schemaVersion' | 'selectedMonthKey' | 
 };
 
 const cloneSeed = (): AkceData => JSON.parse(JSON.stringify(seedData)) as AkceData;
+
+export const emptyFinanceState: AkceData = {
+  schemaVersion: 2,
+  selectedMonthKey: getMonthKey(),
+  expenses: [],
+  incomes: [],
+  fixedExpenses: [],
+  investments: [],
+  categoryBudgets: [],
+  assets: [],
+  goals: [],
+  assetSnapshots: [],
+  settings: { ...seedData.settings, showOnboarding: false },
+};
 
 export function migrateState(input: unknown, currentMonthKey: string = getMonthKey()): AkceData {
   if (!input || typeof input !== 'object') return cloneSeed();
@@ -40,6 +67,9 @@ export function migrateState(input: unknown, currentMonthKey: string = getMonthK
 export const localStorageFinanceRepository: LocalFinanceRepository = {
   kind: 'local',
   loadState(storage: Pick<Storage, 'getItem'> = localStorage): AkceData {
+    if (isEmptyStateMarkerSet(storage)) {
+      return { ...emptyFinanceState, selectedMonthKey: getMonthKey() };
+    }
     try {
       const saved = storage.getItem(storageKey);
       return saved ? migrateState(JSON.parse(saved)) : cloneSeed();

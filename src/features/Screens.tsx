@@ -342,12 +342,34 @@ export function CoachScreen() {
 }
 
 export function SettingsScreen({ account, mode }: { account?: { label: string; detail: string; actionLabel: string; onAction: () => void }; mode?: 'local' | 'firebase' }) {
-  const { state, dispatch } = useAkceStore();
+  const { state, dispatch, resetFinanceData } = useAkceStore();
   const [isTrusted, setIsTrustedState] = useState(() => getIsDeviceTrusted());
+  const [resetSheetOpen, setResetSheetOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
+  const [resetStatus, setResetStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const toggleTrusted = () => {
     const next = !isTrusted;
     setIsDeviceTrusted(next);
     setIsTrustedState(next);
   };
-  return <div className="screen"><PageHeader eyebrow="TERCİHLER" title="Ayarlar" description="Akçe deneyimini kendine göre düzenle." />{account && <section className="settings-card"><div><span>Oturum</span><span className="settings-account"><b>{account.label}</b><small>{account.detail}</small></span></div><div><span>Hesap seçimi</span><button className="secondary-button" onClick={account.onAction}>{account.actionLabel}</button></div></section>}<section className="settings-card"><div><span>Para birimi</span><b>{state.settings.currency}</b></div><div><span>Bütçe başlangıç günü</span><b>Her ayın {state.settings.monthStartDay}. günü</b></div><div><span>Veri saklama</span><b>{mode === 'firebase' ? 'Bulut + cihaz' : 'Bu cihazda'}</b></div><div><span>Cihaz türü</span><button className="secondary-button" onClick={toggleTrusted}>{isTrusted ? 'Kişisel cihaz (Kalıcı önbellek)' : 'Ortak cihaz (Geçici bellek)'}</button></div></section><section className="settings-card"><div><span>Tanıtımı yeniden göster</span><button className="secondary-button" onClick={() => dispatch({ type: 'SET_ONBOARDING', value: true })}>Göster</button></div><div><span>Örnek verileri sıfırla</span><button className="secondary-button secondary-button--danger" onClick={() => dispatch({ type: 'RESET' })}>Sıfırla</button></div></section><p className="settings-note">{mode === 'firebase' ? 'Akçe verilerin bulutta ve bu cihazda saklanır.' : 'Akçe V1 verileri yalnızca bu cihazda saklar.'}</p></div>;
+
+  const openResetSheet = () => { setResetSheetOpen(true); setConfirmText(''); setResetStatus('idle'); };
+  const closeResetSheet = () => { setResetSheetOpen(false); setConfirmText(''); setResetStatus('idle'); };
+  const resetSheetRef = useDialogSheet(resetSheetOpen, closeResetSheet);
+  const viewportHeight = useVisualViewportHeight();
+  const sheetMaxHeight = viewportHeight > 0 ? `${Math.floor(viewportHeight * 0.94)}px` : '94vh';
+
+  const handleResetConfirm = async () => {
+    if (confirmText !== 'SİL') return;
+    setResetStatus('loading');
+    try {
+      await resetFinanceData();
+      setResetStatus('done');
+      setTimeout(closeResetSheet, 1200);
+    } catch {
+      setResetStatus('error');
+    }
+  };
+
+  return <div className="screen"><PageHeader eyebrow="TERCİHLER" title="Ayarlar" description="Akçe deneyimini kendine göre düzenle." />{account && <section className="settings-card"><div><span>Oturum</span><span className="settings-account"><b>{account.label}</b><small>{account.detail}</small></span></div><div><span>Hesap seçimi</span><button className="secondary-button" onClick={account.onAction}>{account.actionLabel}</button></div></section>}<section className="settings-card"><div><span>Para birimi</span><b>{state.settings.currency}</b></div><div><span>Bütçe başlangıç günü</span><b>Her ayın {state.settings.monthStartDay}. günü</b></div><div><span>Veri saklama</span><b>{mode === 'firebase' ? 'Bulut + cihaz' : 'Bu cihazda'}</b></div><div><span>Cihaz türü</span><button className="secondary-button" onClick={toggleTrusted}>{isTrusted ? 'Kişisel cihaz (Kalıcı önbellek)' : 'Ortak cihaz (Geçici bellek)'}</button></div></section><section className="settings-card"><div><span>Tanıtımı yeniden göster</span><button className="secondary-button" onClick={() => dispatch({ type: 'SET_ONBOARDING', value: true })}>Göster</button></div></section><section className="settings-card settings-card--danger"><div><span>Verileri Sıfırla</span><button className="secondary-button secondary-button--danger" onClick={openResetSheet}>Tüm finansal verileri sil</button></div></section><p className="settings-note">{mode === 'firebase' ? 'Akçe verilerin bulutta ve bu cihazda saklanır.' : 'Akçe V1 verileri yalnızca bu cihazda saklar.'}</p>{resetSheetOpen && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) closeResetSheet(); }}><section className="sheet" role="dialog" aria-modal="true" aria-labelledby="reset-title" ref={resetSheetRef} style={{ maxHeight: sheetMaxHeight }}><div className="sheet__handle" /><header className="sheet__header"><div><span className="eyebrow">VERİ SIFIRLAMA</span><h2 id="reset-title">Finansal verileri sil</h2></div><button className="icon-button" onClick={closeResetSheet} aria-label="Kapat"><Icon name="close" /></button></header>{resetStatus === 'done' ? <div className="reset-done"><Icon name="check" /><p>Veriler başarıyla silindi.</p></div> : <><div className="reset-warning"><p><strong>Bu işlem geri alınamaz.</strong></p><ul><li>Harcamalar, gelirler, sabit giderler, yatırımlar, bütçeler, varlıklar ve hedefler silinecek.</li><li>Google hesabı ve AKÇE hesabı silinmeyecek.</li></ul></div><label className="reset-confirm-label"><span>Silme işlemini onaylamak için <strong>SİL</strong> yazın</span><input autoFocus value={confirmText} onChange={e => setConfirmText(e.target.value)} placeholder="SİL" aria-label="Silme onayı" /></label>{resetStatus === 'error' && <p className="form-error">Silme işlemi başarısız oldu. Lütfen tekrar deneyin.</p>}<button className="primary-button primary-button--danger" disabled={confirmText !== 'SİL' || resetStatus === 'loading'} onClick={handleResetConfirm}>{resetStatus === 'loading' ? 'Siliniyor...' : 'Tüm verileri sil'}</button></>}</section></div>}</div>;
 }
