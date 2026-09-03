@@ -4,8 +4,11 @@ import {
   getDaysLeftInMonth, 
   getMonthProgress,
   calculateMonthSummary,
+  calculateInvestmentRatio,
+  calculateExpenseRatio,
   formatCurrency,
   formatPercentage,
+  formatRatio,
   getAssetProgress,
   getTotalAssets
 } from '../financeEngine';
@@ -329,6 +332,66 @@ expect(summary.sevenDayAverage).toBe(1500);
       ];
       
       expect(getTotalAssets(assets)).toBe(447000);
+    });
+  });
+
+  describe('calculateInvestmentRatio', () => {
+    it('should calculate ratio correctly', () => {
+      expect(calculateInvestmentRatio(100000, 30000)).toBe(30);
+    });
+
+    it('should handle zero income', () => {
+      expect(calculateInvestmentRatio(0, 30000)).toBe(0);
+    });
+
+    it('should handle zero investments', () => {
+      expect(calculateInvestmentRatio(100000, 0)).toBe(0);
+    });
+
+    it('should use actualAmount not plannedAmount', () => {
+      expect(calculateInvestmentRatio(100000, 15000)).toBe(15);
+    });
+
+    it('should handle ratio over 100%', () => {
+      expect(calculateInvestmentRatio(50000, 60000)).toBe(120);
+    });
+  });
+
+  describe('calculateExpenseRatio', () => {
+    it('should calculate ratio correctly', () => {
+      expect(calculateExpenseRatio(100000, 20000, 25000)).toBe(45);
+    });
+
+    it('should handle zero income', () => {
+      expect(calculateExpenseRatio(0, 20000, 25000)).toBe(0);
+    });
+
+    it('should handle zero expenses', () => {
+      expect(calculateExpenseRatio(100000, 0, 0)).toBe(0);
+    });
+
+    it('should include fixed expenses', () => {
+      expect(calculateExpenseRatio(100000, 30000, 0)).toBe(30);
+    });
+
+    it('should include variable expenses', () => {
+      expect(calculateExpenseRatio(100000, 0, 45000)).toBe(45);
+    });
+
+    it('should handle ratio over 100%', () => {
+      expect(calculateExpenseRatio(50000, 30000, 30000)).toBe(120);
+    });
+  });
+
+  describe('formatRatio', () => {
+    it('should format non-zero ratio', () => {
+      expect(formatRatio(30)).toBe('%30');
+      expect(formatRatio(45.7)).toBe('%46');
+      expect(formatRatio(120)).toBe('%120');
+    });
+
+    it('should return dash for zero', () => {
+      expect(formatRatio(0)).toBe('—');
     });
   });
 });

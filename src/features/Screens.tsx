@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { coachProvider } from '../domain/coachEngine';
-import { calculateMonthSummary, formatCurrency, formatPercentage, getAssetProgress, getMonthKey, getTotalAssets, getTotalAssetTargets } from '../domain/financeEngine';
+import { calculateMonthSummary, calculateInvestmentRatio, calculateExpenseRatio, formatCurrency, formatPercentage, formatRatio, getAssetProgress, getMonthKey, getTotalAssets, getTotalAssetTargets } from '../domain/financeEngine';
 import { formatMonthKey, getMonthCalculationDate, shiftMonthKey } from '../domain/month';
 import type { Asset, AssetGroup, Income, FixedExpense, CategoryBudget, Investment } from '../domain/types';
 import { ASSET_GROUPS, ASSET_GROUP_LABELS } from '../domain/types';
@@ -65,6 +65,8 @@ export function HomeScreen({ goTo }: { goTo: (page: string) => void }) {
   const totalAssets = getTotalAssets(state.assets);
   const assetTargets = getTotalAssetTargets(state.assets);
   const actualInvestments = state.investments.filter(item => item.monthKey === state.selectedMonthKey).reduce((sum, item) => sum + item.actualAmount, 0);
+  const investmentRatio = calculateInvestmentRatio(summary.totalIncome, actualInvestments);
+  const expenseRatio = calculateExpenseRatio(summary.totalIncome, summary.totalAutomaticExpenses, summary.totalVariableExpenses);
   return <div className="screen home-screen">
     <header className="home-welcome"><div><span className="eyebrow">{formatMonthKey(state.selectedMonthKey).toLocaleUpperCase('tr-TR')}</span><h1>Merhaba, Murat.</h1></div><button className="avatar" aria-label="Profil">MB</button></header>
     <MonthNavigation />
@@ -74,6 +76,13 @@ export function HomeScreen({ goTo }: { goTo: (page: string) => void }) {
         ? <strong>{formatCurrency(summary.dailySafeLimit)}</strong>
         : <><strong>{formatCurrency(0)}</strong><small style={{ display: 'block', color: 'var(--danger)', fontSize: 12, marginTop: 4 }}>Bütçe aşıldı</small></>}
       <div className="hero-balance__meta"><span>Kalan serbest bütçe <b>{formatCurrency(summary.remainingBudget)}</b></span><i /><span>Kalan gün <b>{summary.daysLeft}</b></span></div>
+    </section>
+    <section className="income-ratios">
+      <span className="eyebrow">GELİR DAĞILIMI</span>
+      <div className="income-ratios__grid">
+        <div className="income-ratio-card"><span>Yatırım Oranı</span><strong>{formatRatio(investmentRatio)}</strong><small>Gelirinin yatırıma giden kısmı</small></div>
+        <div className="income-ratio-card"><span>Harcama Oranı</span><strong>{formatRatio(expenseRatio)}</strong><small>Gelirinin harcanan kısmı</small></div>
+      </div>
     </section>
     <section className="tempo">
       <div className="tempo__labels"><span>Ayın <b>%{Math.round(summary.monthProgress)}’i</b> geçti</span><span>Bütçenin <b>%{Math.round(summary.budgetConsumptionRate)}’i</b> kullanıldı</span></div>

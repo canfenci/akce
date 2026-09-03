@@ -172,3 +172,15 @@ export function getTotalAssets(assets: Asset[]): number {
 export function getTotalAssetTargets(assets: Asset[]): number {
   return assets.reduce((sum, asset) => sum + asset.targetAmount, 0);
 }
+
+export function calculateInvestmentRatio(totalIncome: number, totalActualInvestments: number): number {
+  return totalIncome > 0 ? (totalActualInvestments / totalIncome) * 100 : 0;
+}
+
+export function calculateExpenseRatio(totalIncome: number, totalFixedExpenses: number, totalVariableExpenses: number): number {
+  return totalIncome > 0 ? ((totalFixedExpenses + totalVariableExpenses) / totalIncome) * 100 : 0;
+}
+
+export function formatRatio(value: number): string {
+  return value === 0 ? '—' : `%${Math.round(value)}`;
+}

@@ -283,3 +283,21 @@ describe('Investment vs Asset clarity', () => {
     expect(screen.getByText('Birikmiş finansal varlıklarının güncel değerini takip et. Yatırım ekranı aylık katkını, Varlıklar ekranı toplam birikmiş değerini gösterir.')).toBeTruthy();
   });
 });
+
+describe('Home screen income ratios', () => {
+  it('renders Gelir Dağılımı section with both ratio cards', async () => {
+    const { HomeScreen } = await import('../../features/Screens');
+    const wrapper = createTestWrapper();
+    render(<HomeScreen goTo={() => {}} />, { wrapper });
+    expect(screen.getByText('GELİR DAĞILIMI')).toBeTruthy();
+    expect(screen.getByText('Yatırım Oranı')).toBeTruthy();
+    expect(screen.getByText('Harcama Oranı')).toBeTruthy();
+  });
+
+  it('does not break daily safe spending hero', async () => {
+    const { HomeScreen } = await import('../../features/Screens');
+    const wrapper = createTestWrapper();
+    render(<HomeScreen goTo={() => {}} />, { wrapper });
+    expect(screen.getByText('BUGÜN GÜVENLE HARCAYABİLECEĞİN')).toBeTruthy();
+  });
+});
