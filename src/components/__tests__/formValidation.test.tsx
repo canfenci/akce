@@ -213,6 +213,8 @@ describe('Budget form validation', () => {
     const newAsset = {
       id: 'asset-new-1',
       group: 'Nakit' as const,
+      name: 'Acil Nakit',
+      valuationMode: 'direct' as const,
       currentAmount: 25000,
       targetAmount: 50000,
       createdAt: Date.now(),
@@ -238,6 +240,8 @@ describe('Budget form validation', () => {
     const newAsset = {
       id: 'asset-extra',
       group: 'Kripto' as const,
+      name: 'Kripto Varlık',
+      valuationMode: 'direct' as const,
       currentAmount: 10000,
       targetAmount: 0,
       createdAt: Date.now(),
@@ -295,7 +299,7 @@ describe('Budget form validation', () => {
 
   it('asset create maps to asset.create Firestore mutation', async () => {
     const { mapActionToMutation } = await import('../../store/AkceStore');
-    const asset = { id: 'a1', group: 'Altın' as const, currentAmount: 1000, targetAmount: 2000, createdAt: 1, updatedAt: 1, userId: 'u' };
+    const asset = { id: 'a1', group: 'Altın' as const, name: 'Gram Altın', valuationMode: 'direct' as const, currentAmount: 1000, targetAmount: 2000, createdAt: 1, updatedAt: 1, userId: 'u' };
     const mutation = mapActionToMutation({ type: 'ADD_ASSET', payload: asset }, seedData);
     expect(mutation).toEqual({ type: 'asset.create', value: asset });
   });

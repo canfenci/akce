@@ -148,4 +148,59 @@ describe('Firestore finance repository', () => {
     const income = { ...seedData.incomes[0], monthKey };
     await expect(repository.applyMutation(uid, { type: 'income.update', value: income })).rejects.toMatchObject({ kind: 'permission-denied', message: 'Firestore erişim izni reddedildi.' });
   });
+
+  describe('AKCE-034: asset DTO round-trip', () => {
+    const uid = 'user-1';
+    const deviceId = 'device-1';
+    const timestamp = { server: true };
+
+    it('quantity asset round-trips through DTO', () => {
+      const asset = { id: 'a1', group: 'Altın' as const, name: 'Gram Altın', valuationMode: 'quantity' as const, quantity: 125.5, unit: 'Gram' as const, unitPrice: 3100, currentAmount: 389050, targetAmount: 500000, createdAt: 1, updatedAt: 1, userId: uid };
+      const dto = toFirestoreDto(asset, deviceId, timestamp);
+      const domain = fromFirestoreDto('assets', 'a1', uid, dto as Record<string, unknown>);
+      expect(domain.name).toBe('Gram Altın');
+      expect(domain.valuationMode).toBe('quantity');
+      expect(domain.quantity).toBe(125.5);
+      expect(domain.unit).toBe('Gram');
+      expect(domain.unitPrice).toBe(3100);
+      expect(domain.currentAmount).toBe(389050);
+    });
+
+    it('direct asset round-trips through DTO', () => {
+      const asset = { id: 'a2', group: 'BES' as const, name: 'Allianz BES', valuationMode: 'direct' as const, currentAmount: 64300, targetAmount: 200000, createdAt: 1, updatedAt: 1, userId: uid };
+      const dto = toFirestoreDto(asset, deviceId, timestamp);
+      const domain = fromFirestoreDto('assets', 'a2', uid, dto as Record<string, unknown>);
+      expect(domain.name).toBe('Allianz BES');
+      expect(domain.valuationMode).toBe('direct');
+      expect(domain.currentAmount).toBe(64300);
+    });
+
+    it('old Firestore document without name/valuationMode loads as direct mode', () => {
+      const oldDto = { group: 'TEFAS', currentAmount: 132000, targetAmount: 200000, schemaVersion: 2, deviceId: 'old', createdAt: 1, updatedAt: 1, serverUpdatedAt: timestamp };
+      const domain = fromFirestoreDto('assets', 'a1', uid, oldDto);
+      expect(domain.name).toBe('');
+      expect(domain.valuationMode).toBe('direct');
+      expect(domain.currentAmount).toBe(132000);
+    });
+
+    it('allowed group enum includes new values', () => {
+      const groups = ['TEFAS', 'Nasdaq', 'Altın', 'Gümüş', 'BES', 'Nakit', 'Mevduat', 'Kripto', 'Diğer', 'BIST Hisse', 'Döviz', 'Eurobond / Tahvil'] as const;
+      for (const group of groups) {
+        const asset = { id: 'a1', group, name: 'Test', valuationMode: 'direct' as const, currentAmount: 100, targetAmount: 200, createdAt: 1, updatedAt: 1, userId: uid };
+        const dto = toFirestoreDto(asset, deviceId, timestamp);
+        const domain = fromFirestoreDto('assets', 'a1', uid, dto as Record<string, unknown>);
+        expect(domain.group).toBe(group);
+      }
+    });
+
+    it('allowed unit enum values', () => {
+      const units = ['Adet', 'Gram', 'Pay', 'Lot', 'TL', 'USD', 'EUR', 'GBP', 'Ons', 'Diğer'];
+      for (const unit of units) {
+        const asset = { id: 'a1', group: 'Altın' as const, name: 'Test', valuationMode: 'quantity' as const, quantity: 1, unit: unit as any, unitPrice: 100, currentAmount: 100, targetAmount: 200, createdAt: 1, updatedAt: 1, userId: uid };
+        const dto = toFirestoreDto(asset, deviceId, timestamp);
+        const domain = fromFirestoreDto('assets', 'a1', uid, dto as Record<string, unknown>);
+        expect(domain.unit).toBe(unit);
+      }
+    });
+  });
 });

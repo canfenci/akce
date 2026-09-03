@@ -10,9 +10,10 @@ import {
   formatPercentage,
   formatRatio,
   getAssetProgress,
-  getTotalAssets
+  getTotalAssets,
+  getTotalAssetTargets
 } from '../financeEngine';
-import { Expense, Income, FixedExpense, Investment, Asset } from '../types';
+import { Expense, Income, FixedExpense, Investment, Asset, AssetGroup } from '../types';
 
 describe('Finance Engine', () => {
   describe('getMonthKey', () => {
@@ -297,6 +298,8 @@ expect(summary.sevenDayAverage).toBe(1500);
       const asset: Asset = {
         id: '1',
         group: 'TEFAS',
+        name: 'TEFAS Fonu',
+        valuationMode: 'direct',
         currentAmount: 132000,
         targetAmount: 200000,
         createdAt: 1,
@@ -311,6 +314,8 @@ expect(summary.sevenDayAverage).toBe(1500);
       const asset: Asset = {
         id: '1',
         group: 'TEFAS',
+        name: 'TEFAS Fonu',
+        valuationMode: 'direct',
         currentAmount: 10000,
         targetAmount: 0,
         createdAt: 1,
@@ -325,10 +330,10 @@ expect(summary.sevenDayAverage).toBe(1500);
   describe('getTotalAssets', () => {
     it('should sum all asset current amounts', () => {
       const assets: Asset[] = [
-        { id: '1', group: 'TEFAS', currentAmount: 132000, targetAmount: 200000, createdAt: 1, updatedAt: 1, userId: 'user1' },
-        { id: '2', group: 'Nasdaq', currentAmount: 185000, targetAmount: 250000, createdAt: 1, updatedAt: 1, userId: 'user1' },
-        { id: '3', group: 'Altın', currentAmount: 74000, targetAmount: 150000, createdAt: 1, updatedAt: 1, userId: 'user1' },
-        { id: '4', group: 'BES', currentAmount: 56000, targetAmount: 150000, createdAt: 1, updatedAt: 1, userId: 'user1' }
+        { id: '1', group: 'TEFAS', name: 'TEFAS Fonu', valuationMode: 'direct', currentAmount: 132000, targetAmount: 200000, createdAt: 1, updatedAt: 1, userId: 'user1' },
+        { id: '2', group: 'Nasdaq', name: 'NASDAQ ETF', valuationMode: 'direct', currentAmount: 185000, targetAmount: 250000, createdAt: 1, updatedAt: 1, userId: 'user1' },
+        { id: '3', group: 'Altın', name: 'Gram Altın', valuationMode: 'direct', currentAmount: 74000, targetAmount: 150000, createdAt: 1, updatedAt: 1, userId: 'user1' },
+        { id: '4', group: 'BES', name: 'BES', valuationMode: 'direct', currentAmount: 56000, targetAmount: 150000, createdAt: 1, updatedAt: 1, userId: 'user1' }
       ];
       
       expect(getTotalAssets(assets)).toBe(447000);
@@ -506,6 +511,58 @@ expect(summary.sevenDayAverage).toBe(1500);
       const summary = calculateMonthSummary(incomes, fixedExpenses, investments, expenses, [], new Date('2024-09-15'));
       expect(summary.remainingBudget).toBeLessThan(0);
       expect(summary.dailySafeLimit).toBe(0);
+    });
+  });
+
+  describe('AKCE-034: asset quantity valuation', () => {
+    const common = { createdAt: 1, updatedAt: 1, userId: 'u' };
+
+    it('legacy asset without name/valuationMode loads as direct mode', () => {
+      const asset = { id: 'a1', group: 'Altın' as const, currentAmount: 74000, targetAmount: 150000, ...common } as Asset;
+      expect(asset.currentAmount).toBe(74000);
+    });
+
+    it('total assets includes quantity-derived currentAmount', () => {
+      const assets: Asset[] = [
+        { id: 'a1', group: 'Altın', name: 'Gram Altın', valuationMode: 'quantity', quantity: 24, unit: 'Gram', unitPrice: 3083, currentAmount: 73992, targetAmount: 150000, ...common },
+        { id: 'a2', group: 'BES', name: 'Allianz BES', valuationMode: 'direct', currentAmount: 56000, targetAmount: 300000, ...common },
+      ];
+      expect(getTotalAssets(assets)).toBe(129992);
+    });
+
+    it('total assets includes direct currentAmount', () => {
+      const assets: Asset[] = [
+        { id: 'a1', group: 'Nakit', name: 'Acil Nakit', valuationMode: 'direct', currentAmount: 20000, targetAmount: 0, ...common },
+      ];
+      expect(getTotalAssets(assets)).toBe(20000);
+    });
+
+    it('global goal remains correct with mixed asset types', () => {
+      const assets: Asset[] = [
+        { id: 'a1', group: 'Altın', name: 'Bilezik', valuationMode: 'quantity', quantity: 3, unit: 'Adet', unitPrice: 25000, currentAmount: 75000, targetAmount: 100000, ...common },
+        { id: 'a2', group: 'BES', name: 'BES', valuationMode: 'direct', currentAmount: 64300, targetAmount: 200000, ...common },
+      ];
+      expect(getTotalAssets(assets)).toBe(139300);
+      expect(getTotalAssetTargets(assets)).toBe(300000);
+    });
+
+    it('quantity × unitPrice matches currentAmount', () => {
+      const quantity = 125.5;
+      const unitPrice = 3100;
+      const currentAmount = quantity * unitPrice;
+      expect(currentAmount).toBe(389050);
+    });
+
+    it('decimal quantity works correctly', () => {
+      const quantity = 1482.438;
+      const unitPrice = 4.35;
+      const currentAmount = quantity * unitPrice;
+      expect(currentAmount).toBeCloseTo(6448.61, 1);
+    });
+
+    it('asset group enum includes new values', () => {
+      const groups: AssetGroup[] = ['TEFAS', 'Nasdaq', 'Altın', 'Gümüş', 'BES', 'Nakit', 'Mevduat', 'Kripto', 'Diğer', 'BIST Hisse', 'Döviz', 'Eurobond / Tahvil'];
+      expect(groups.length).toBe(12);
     });
   });
 });

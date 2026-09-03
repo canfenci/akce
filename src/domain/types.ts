@@ -53,11 +53,11 @@ export interface Investment {
   userId: string;
 }
 
-export type AssetGroup = 'TEFAS' | 'Nasdaq' | 'Altın' | 'Gümüş' | 'BES' | 'Nakit' | 'Mevduat' | 'Kripto' | 'Diğer';
+export type AssetGroup = 'TEFAS' | 'Nasdaq' | 'Altın' | 'Gümüş' | 'BES' | 'Nakit' | 'Mevduat' | 'Kripto' | 'Diğer' | 'BIST Hisse' | 'Döviz' | 'Eurobond / Tahvil';
 
 export const ASSET_GROUP_LABELS: Record<AssetGroup, string> = {
-  TEFAS: 'TEFAS',
-  Nasdaq: 'ABD / Nasdaq',
+  TEFAS: 'TEFAS / Fon',
+  Nasdaq: 'ABD Hisse / ETF',
   Altın: 'Altın',
   Gümüş: 'Gümüş',
   BES: 'BES',
@@ -65,13 +65,40 @@ export const ASSET_GROUP_LABELS: Record<AssetGroup, string> = {
   Mevduat: 'Mevduat',
   Kripto: 'Kripto',
   Diğer: 'Diğer',
+  'BIST Hisse': 'BIST Hisse',
+  Döviz: 'Döviz',
+  'Eurobond / Tahvil': 'Eurobond / Tahvil',
 };
 
-export const ASSET_GROUPS: AssetGroup[] = ['TEFAS', 'Nasdaq', 'Altın', 'Gümüş', 'BES', 'Nakit', 'Mevduat', 'Kripto', 'Diğer'];
+export const ASSET_GROUPS: AssetGroup[] = ['Altın', 'TEFAS', 'BIST Hisse', 'Nasdaq', 'Döviz', 'Gümüş', 'BES', 'Eurobond / Tahvil', 'Nakit', 'Mevduat', 'Kripto', 'Diğer'];
+
+export type ValuationMode = 'quantity' | 'direct';
+
+export type AssetUnit = 'Adet' | 'Gram' | 'Pay' | 'Lot' | 'TL' | 'USD' | 'EUR' | 'GBP' | 'Ons' | 'Diğer';
+
+export const ASSET_UNITS: AssetUnit[] = ['Adet', 'Gram', 'Pay', 'Lot', 'TL', 'USD', 'EUR', 'GBP', 'Ons', 'Diğer'];
+
+export const ASSET_UNIT_LABELS: Record<AssetUnit, string> = {
+  Adet: 'Adet',
+  Gram: 'Gram',
+  Pay: 'Pay',
+  Lot: 'Lot',
+  TL: 'TL',
+  USD: 'USD',
+  EUR: 'EUR',
+  GBP: 'GBP',
+  Ons: 'Ons',
+  Diğer: 'Diğer',
+};
 
 export interface Asset {
   id: string;
   group: AssetGroup;
+  name: string;
+  valuationMode: ValuationMode;
+  quantity?: number;
+  unit?: AssetUnit;
+  unitPrice?: number;
   currentAmount: number;
   targetAmount: number;
   createdAt: number;

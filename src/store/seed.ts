@@ -52,11 +52,11 @@ export const seedData: AkceData = {
     { id: 'expense-4', amount: 900, category: 'Diğer', type: 'plansız', paymentMethod: 'nakit', note: 'Beklenmedik ihtiyaç', date: dateAgo(2), monthKey, ...common },
   ],
   assets: [
-    { id: 'asset-1', group: 'TEFAS', currentAmount: 132000, targetAmount: 200000, ...common },
-    { id: 'asset-2', group: 'Nasdaq', currentAmount: 185000, targetAmount: 250000, ...common },
-    { id: 'asset-3', group: 'Altın', currentAmount: 74000, targetAmount: 150000, ...common },
-    { id: 'asset-4', group: 'Gümüş', currentAmount: 24000, targetAmount: 100000, ...common },
-    { id: 'asset-5', group: 'BES', currentAmount: 56000, targetAmount: 300000, ...common },
+    { id: 'asset-1', group: 'TEFAS', name: 'Acil Yatırım Fonu', valuationMode: 'direct', currentAmount: 132000, targetAmount: 200000, ...common },
+    { id: 'asset-2', group: 'Nasdaq', name: 'NASDAQ 100 ETF', valuationMode: 'direct', currentAmount: 185000, targetAmount: 250000, ...common },
+    { id: 'asset-3', group: 'Altın', name: 'Gram Altın', valuationMode: 'quantity', quantity: 24, unit: 'Gram', unitPrice: 3083, currentAmount: 74000, targetAmount: 150000, ...common },
+    { id: 'asset-4', group: 'Gümüş', name: 'Gümüş Fonu', valuationMode: 'direct', currentAmount: 24000, targetAmount: 100000, ...common },
+    { id: 'asset-5', group: 'BES', name: 'Allianz BES', valuationMode: 'direct', currentAmount: 56000, targetAmount: 300000, ...common },
   ],
   goals: [{ id: 'goal-1', assetGroupId: 'freedom', targetAmount: 1000000, ...common }],
   categoryBudgets: [

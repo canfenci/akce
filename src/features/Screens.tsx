@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { coachProvider } from '../domain/coachEngine';
 import { calculateMonthSummary, calculateInvestmentRatio, calculateExpenseRatio, formatCurrency, formatPercentage, formatRatio, getAssetProgress, getMonthKey, getTotalAssets, getTotalAssetTargets } from '../domain/financeEngine';
 import { formatMonthKey, getMonthCalculationDate, shiftMonthKey } from '../domain/month';
-import type { Asset, AssetGroup, Income, FixedExpense, CategoryBudget, Investment } from '../domain/types';
-import { ASSET_GROUPS, ASSET_GROUP_LABELS } from '../domain/types';
+import type { Asset, AssetGroup, AssetUnit, Income, FixedExpense, CategoryBudget, Investment } from '../domain/types';
+import { ASSET_GROUPS, ASSET_GROUP_LABELS, ASSET_UNITS, ASSET_UNIT_LABELS } from '../domain/types';
 import { useAkceStore } from '../store/AkceStore';
 import { useAuth } from '../auth/AuthProvider';
 import { getIsDeviceTrusted, setIsDeviceTrusted } from '../store/devicePreference';
@@ -382,7 +382,12 @@ export function AssetsScreen({ openFormSignal, onFormSignalConsumed }: { openFor
   const goal = state.goals[0];
 
   const [assetForm, setAssetForm] = useState<AssetFormState>({ isOpen: false, mode: 'add' });
-  const [assetGroup, setAssetGroup] = useState<AssetGroup>('TEFAS');
+  const [assetGroup, setAssetGroup] = useState<AssetGroup>('Altın');
+  const [assetName, setAssetName] = useState('');
+  const [valuationMode, setValuationMode] = useState<'quantity' | 'direct'>('direct');
+  const [quantity, setQuantity] = useState('');
+  const [unit, setUnit] = useState<AssetUnit>('Adet');
+  const [unitPrice, setUnitPrice] = useState('');
   const [currentAmount, setCurrentAmount] = useState('');
   const [targetAmount, setTargetAmount] = useState('');
   const [formError, setFormError] = useState('');
@@ -397,8 +402,11 @@ export function AssetsScreen({ openFormSignal, onFormSignalConsumed }: { openFor
   const viewportHeight = useVisualViewportHeight();
   const sheetMaxHeight = viewportHeight > 0 ? `${Math.floor(viewportHeight * 0.94)}px` : '94vh';
 
+  const derivedCurrentAmount = valuationMode === 'quantity' ? (Number(quantity) || 0) * (Number(unitPrice) || 0) : Number(currentAmount) || 0;
+
   const openAddAsset = () => {
-    setAssetGroup('TEFAS'); setCurrentAmount(''); setTargetAmount(''); setFormError('');
+    setAssetGroup('Altın'); setAssetName(''); setValuationMode('direct');
+    setQuantity(''); setUnit('Adet'); setUnitPrice(''); setCurrentAmount(''); setTargetAmount(''); setFormError('');
     setAssetForm({ isOpen: true, mode: 'add' });
   };
 
@@ -411,6 +419,11 @@ export function AssetsScreen({ openFormSignal, onFormSignalConsumed }: { openFor
 
   const openEditAsset = (asset: Asset) => {
     setAssetGroup(asset.group);
+    setAssetName(asset.name);
+    setValuationMode(asset.valuationMode);
+    setQuantity(asset.quantity !== undefined ? String(asset.quantity) : '');
+    setUnit(asset.unit ?? 'Adet');
+    setUnitPrice(asset.unitPrice !== undefined ? String(asset.unitPrice) : '');
     setCurrentAmount(String(asset.currentAmount));
     setTargetAmount(String(asset.targetAmount));
     setFormError('');
@@ -418,15 +431,26 @@ export function AssetsScreen({ openFormSignal, onFormSignalConsumed }: { openFor
   };
 
   const saveAsset = () => {
-    const cur = Number(currentAmount);
     const tgt = Number(targetAmount);
-    if (!Number.isFinite(cur) || cur < 0) { setFormError('Mevcut tutar 0 veya daha büyük olmalı.'); return; }
+    if (!assetName.trim()) { setFormError('Ad boş olamaz.'); return; }
     if (!Number.isFinite(tgt) || tgt < 0) { setFormError('Hedef tutar 0 veya daha büyük olmalı.'); return; }
-    const now = Date.now();
-    if (assetForm.mode === 'edit' && assetForm.currentAsset) {
-      dispatch({ type: 'UPDATE_ASSET', id: assetForm.currentAsset.id, amount: cur, targetAmount: tgt });
+    let cur: number;
+    if (valuationMode === 'quantity') {
+      const qty = Number(quantity);
+      const price = Number(unitPrice);
+      if (!Number.isFinite(qty) || qty <= 0) { setFormError('Miktar 0\'dan büyük olmalı.'); return; }
+      if (!Number.isFinite(price) || price < 0) { setFormError('Birim fiyat 0 veya daha büyük olmalı.'); return; }
+      cur = qty * price;
     } else {
-      dispatch({ type: 'ADD_ASSET', payload: { id: crypto.randomUUID(), group: assetGroup, currentAmount: cur, targetAmount: tgt, createdAt: now, updatedAt: now, userId: 'local-user' } });
+      cur = Number(currentAmount);
+      if (!Number.isFinite(cur) || cur < 0) { setFormError('Güncel değer 0 veya daha büyük olmalı.'); return; }
+    }
+    const now = Date.now();
+    const assetPayload = { group: assetGroup, name: assetName.trim(), valuationMode, quantity: valuationMode === 'quantity' ? Number(quantity) : undefined, unit: valuationMode === 'quantity' ? unit : undefined, unitPrice: valuationMode === 'quantity' ? Number(unitPrice) : undefined, currentAmount: cur, targetAmount: tgt };
+    if (assetForm.mode === 'edit' && assetForm.currentAsset) {
+      dispatch({ type: 'UPDATE_ASSET', id: assetForm.currentAsset.id, amount: cur, targetAmount: tgt, name: assetPayload.name, group: assetPayload.group, valuationMode: assetPayload.valuationMode, quantity: assetPayload.quantity, unit: assetPayload.unit, unitPrice: assetPayload.unitPrice });
+    } else {
+      dispatch({ type: 'ADD_ASSET', payload: { id: crypto.randomUUID(), ...assetPayload, createdAt: now, updatedAt: now, userId: 'local-user' } });
     }
     closeAssetForm();
   };
@@ -461,9 +485,11 @@ export function AssetsScreen({ openFormSignal, onFormSignalConsumed }: { openFor
           return <article className="asset-card" key={asset.id}>
             <header>
               <span className="asset-monogram">{asset.group.slice(0, 2).toLocaleUpperCase('tr-TR')}</span>
-              <div><b>{ASSET_GROUP_LABELS[asset.group]}</b><small>{asset.targetAmount > 0 ? `Hedefin %${Math.round(progress)}'i` : 'Hedef belirlenmemiş'}</small></div>
+              <div><b>{asset.name || ASSET_GROUP_LABELS[asset.group]}</b><small>{ASSET_GROUP_LABELS[asset.group]}{asset.valuationMode === 'quantity' && asset.quantity && asset.unit && asset.unitPrice ? '' : ''}</small></div>
             </header>
-            <h3>{formatCurrency(asset.currentAmount)}</h3>
+            {asset.valuationMode === 'quantity' && asset.quantity && asset.unit && asset.unitPrice
+              ? <><p className="asset-card__detail">{asset.quantity} {ASSET_UNIT_LABELS[asset.unit]} × {formatCurrency(asset.unitPrice)}</p><h3>{formatCurrency(asset.currentAmount)}</h3></>
+              : <h3>{formatCurrency(asset.currentAmount)}</h3>}
             {asset.targetAmount > 0 && <p>{formatCurrency(asset.targetAmount)} hedef</p>}
             {asset.targetAmount > 0 && <><Progress value={progress} tone="gold" /><div><span>Hedefe kalan</span><b>{formatCurrency(Math.max(0, asset.targetAmount - asset.currentAmount))}</b></div></>}
             <div className="asset-card__actions">
@@ -477,8 +503,18 @@ export function AssetsScreen({ openFormSignal, onFormSignalConsumed }: { openFor
       <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="asset-form-title" ref={assetSheetRef} style={{ maxHeight: sheetMaxHeight }}>
         <div className="sheet__handle" />
         <header className="sheet__header"><div><span className="eyebrow">VARLIK</span><h2 id="asset-form-title">{assetForm.mode === 'add' ? 'Yeni varlık' : 'Varlığı düzenle'}</h2></div><button className="icon-button" onClick={closeAssetForm} aria-label="Kapat"><Icon name="close" /></button></header>
-        <label className="field">Tür / kategori<select value={assetGroup} onChange={e => setAssetGroup(e.target.value as AssetGroup)}>{ASSET_GROUPS.map(g => <option key={g} value={g}>{ASSET_GROUP_LABELS[g]}</option>)}</select></label>
-        <label className="amount-input"><span>Güncel değer</span><div><input autoFocus inputMode="decimal" value={currentAmount} onChange={e => { setCurrentAmount(e.target.value.replace(/[^0-9.]/g, '')); setFormError(''); }} placeholder="0" aria-label="Güncel değer" /><b>TL</b></div></label>
+        <label className="field">Tür<select value={assetGroup} onChange={e => setAssetGroup(e.target.value as AssetGroup)}>{ASSET_GROUPS.map(g => <option key={g} value={g}>{ASSET_GROUP_LABELS[g]}</option>)}</select></label>
+        <label className="field">Ad<input value={assetName} onChange={e => { setAssetName(e.target.value); setFormError(''); }} placeholder="Örn: Gram Altın" /></label>
+        <fieldset className="segmented"><legend>Değerleme yöntemi</legend>{(['direct', 'quantity'] as const).map(value => <button type="button" key={value} className={valuationMode === value ? 'active' : ''} onClick={() => { setValuationMode(value); setFormError(''); }}>{value === 'direct' ? 'Doğrudan' : 'Miktar × Fiyat'}</button>)}</fieldset>
+        {valuationMode === 'quantity' && <>
+          <div className="form-grid">
+            <label className="field">Miktar<input inputMode="decimal" value={quantity} onChange={e => { setQuantity(e.target.value.replace(/[^0-9.]/g, '')); setFormError(''); }} placeholder="0" /></label>
+            <label className="field">Birim<select value={unit} onChange={e => setUnit(e.target.value as AssetUnit)}>{ASSET_UNITS.map(u => <option key={u} value={u}>{ASSET_UNIT_LABELS[u]}</option>)}</select></label>
+          </div>
+          <label className="amount-input"><span>Birim fiyat</span><div><input inputMode="decimal" value={unitPrice} onChange={e => { setUnitPrice(e.target.value.replace(/[^0-9.]/g, '')); setFormError(''); }} placeholder="0" aria-label="Birim fiyat" /><b>TL</b></div></label>
+          <label className="amount-input"><span>Güncel değer</span><div><input value={formatCurrency(derivedCurrentAmount)} readOnly aria-label="Güncel değer" /><b>TL</b></div></label>
+        </>}
+        {valuationMode === 'direct' && <label className="amount-input"><span>Güncel değer</span><div><input autoFocus inputMode="decimal" value={currentAmount} onChange={e => { setCurrentAmount(e.target.value.replace(/[^0-9.]/g, '')); setFormError(''); }} placeholder="0" aria-label="Güncel değer" /><b>TL</b></div></label>}
         <label className="amount-input"><span>Hedef değer (isteğe bağlı)</span><div><input inputMode="decimal" value={targetAmount} onChange={e => { setTargetAmount(e.target.value.replace(/[^0-9.]/g, '')); setFormError(''); }} placeholder="0" aria-label="Hedef değer" /><b>TL</b></div></label>
         {formError && <p className="form-error">{formError}</p>}
         <button className="primary-button" onClick={saveAsset}>{assetForm.mode === 'add' ? 'Varlığı kaydet' : 'Güncelle'}</button>
@@ -489,7 +525,7 @@ export function AssetsScreen({ openFormSignal, onFormSignalConsumed }: { openFor
       <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="delete-confirm-title" ref={deleteSheetRef} style={{ maxHeight: sheetMaxHeight }}>
         <div className="sheet__handle" />
         <header className="sheet__header"><div><span className="eyebrow">VARLIK SİL</span><h2 id="delete-confirm-title">Varlığı sil</h2></div><button className="icon-button" onClick={closeDeleteConfirm} aria-label="Kapat"><Icon name="close" /></button></header>
-        <p className="delete-confirm-text"><b>{ASSET_GROUP_LABELS[deleteConfirm.asset.group]}</b> varlığını silmek istediğine emin misin? Bu işlem geri alınamaz.</p>
+        <p className="delete-confirm-text"><b>{deleteConfirm.asset.name || ASSET_GROUP_LABELS[deleteConfirm.asset.group]}</b> varlığını silmek istediğine emin misin? Bu işlem geri alınamaz.</p>
         <div className="delete-confirm-actions">
           <button className="secondary-button" onClick={closeDeleteConfirm}>İptal</button>
           <button className="primary-button primary-button--danger" onClick={confirmDelete}>Evet, sil</button>

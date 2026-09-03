@@ -48,11 +48,16 @@ service cloud.firestore {
           && validSchemaVersion()
           && validNumber(request.resource.data.currentAmount, 0)
           && validNumber(request.resource.data.targetAmount, 0)
-          && (request.resource.data.group in ['TEFAS', 'Nasdaq', 'Altın', 'Gümüş', 'BES', 'Nakit', 'Mevduat', 'Kripto', 'Diğer']);
+          && (request.resource.data.group in ['TEFAS', 'Nasdaq', 'Altın', 'Gümüş', 'BES', 'Nakit', 'Mevduat', 'Kripto', 'Diğer', 'BIST Hisse', 'Döviz', 'Eurobond / Tahvil'])
+          && (request.resource.data.valuationMode in ['quantity', 'direct'])
+          && (!request.resource.data.quantity || validNumber(request.resource.data.quantity, 0))
+          && (!request.resource.data.unitPrice || validNumber(request.resource.data.unitPrice, 0));
         allow update: if isOwner(uid)
           && validSchemaVersion()
           && validNumber(request.resource.data.currentAmount, 0)
-          && validNumber(request.resource.data.targetAmount, 0);
+          && validNumber(request.resource.data.targetAmount, 0)
+          && (!request.resource.data.quantity || validNumber(request.resource.data.quantity, 0))
+          && (!request.resource.data.unitPrice || validNumber(request.resource.data.unitPrice, 0));
         allow delete: if isOwner(uid);
       }
 

@@ -1,4 +1,4 @@
-import type { Asset, AssetSnapshot, AssetGroup, CategoryBudget, Expense, FixedExpense, Goal, Income, Investment } from '../domain/types';
+import type { Asset, AssetSnapshot, AssetGroup, AssetUnit, CategoryBudget, Expense, FixedExpense, Goal, Income, Investment } from '../domain/types';
 import { isMonthKey } from '../domain/month';
 import { FinanceRepositoryError, type FinanceCollection, type FinanceCollectionMap } from './financeRepository';
 
@@ -57,7 +57,16 @@ export function fromFirestoreDto<K extends FinanceCollection>(collection: K, id:
     case 'fixedExpenses': value = { id, userId: uid, name: stringValue(data, 'name'), amount: numberValue(data, 'amount'), dueDay: numberValue(data, 'dueDay'), category: stringValue(data, 'category'), frequency: enumValue(data, 'frequency', ['monthly', 'yearly']), active: booleanValue(data, 'active'), monthKey: monthKeyValue(data), createdAt: metadataNumber(data, 'createdAt'), updatedAt: metadataNumber(data, 'updatedAt') }; break;
     case 'investments': value = { id, userId: uid, group: enumValue(data, 'group', ['TEFAS', 'Nasdaq', 'Altın', 'Gümüş', 'BES']), plannedAmount: numberValue(data, 'plannedAmount'), actualAmount: numberValue(data, 'actualAmount'), completed: booleanValue(data, 'completed'), completedDate: optionalString(data, 'completedDate'), note: optionalString(data, 'note'), monthKey: monthKeyValue(data), createdAt: metadataNumber(data, 'createdAt'), updatedAt: metadataNumber(data, 'updatedAt') }; break;
     case 'categoryBudgets': value = { id, name: stringValue(data, 'name'), limit: numberValue(data, 'limit'), color: stringValue(data, 'color'), monthKey: monthKeyValue(data) }; break;
-    case 'assets': value = { id, userId: uid, group: enumValue(data, 'group', ['TEFAS', 'Nasdaq', 'Altın', 'Gümüş', 'BES', 'Nakit', 'Mevduat', 'Kripto', 'Diğer'] as readonly AssetGroup[]), currentAmount: numberValue(data, 'currentAmount'), targetAmount: numberValue(data, 'targetAmount'), createdAt: metadataNumber(data, 'createdAt'), updatedAt: metadataNumber(data, 'updatedAt') }; break;
+    case 'assets': {
+      const group = enumValue(data, 'group', ['TEFAS', 'Nasdaq', 'Altın', 'Gümüş', 'BES', 'Nakit', 'Mevduat', 'Kripto', 'Diğer', 'BIST Hisse', 'Döviz', 'Eurobond / Tahvil'] as readonly AssetGroup[]);
+      const name = optionalString(data, 'name') ?? '';
+      const valuationMode = (data.valuationMode === 'quantity' || data.valuationMode === 'direct') ? data.valuationMode as 'quantity' | 'direct' : 'direct';
+      const quantity = typeof data.quantity === 'number' && Number.isFinite(data.quantity) ? data.quantity : undefined;
+      const unit = (typeof data.unit === 'string' && ['Adet', 'Gram', 'Pay', 'Lot', 'TL', 'USD', 'EUR', 'GBP', 'Ons', 'Diğer'].includes(data.unit)) ? data.unit as AssetUnit : undefined;
+      const unitPrice = typeof data.unitPrice === 'number' && Number.isFinite(data.unitPrice) ? data.unitPrice : undefined;
+      value = { id, userId: uid, group, name, valuationMode, quantity, unit, unitPrice, currentAmount: numberValue(data, 'currentAmount'), targetAmount: numberValue(data, 'targetAmount'), createdAt: metadataNumber(data, 'createdAt'), updatedAt: metadataNumber(data, 'updatedAt') };
+      break;
+    }
     case 'goals': value = { id, userId: uid, assetGroupId: stringValue(data, 'assetGroupId'), targetAmount: numberValue(data, 'targetAmount'), createdAt: metadataNumber(data, 'createdAt'), updatedAt: metadataNumber(data, 'updatedAt') }; break;
     case 'assetSnapshots': value = { id, assetId: stringValue(data, 'assetId'), monthKey: monthKeyValue(data), amount: numberValue(data, 'amount'), createdAt: metadataNumber(data, 'createdAt') }; break;
   }
