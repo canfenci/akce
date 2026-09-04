@@ -397,12 +397,12 @@ describe('Home screen income ratios', () => {
 });
 
 describe('UX polish pack', () => {
-  it('asset edit button meets 44px touch target', () => {
+  it('asset icon-action buttons meet 44px touch target', () => {
     const style = document.createElement('style');
-    style.textContent = '.delete-button{width:44px;height:44px}';
+    style.textContent = '.icon-action{width:44px;height:44px;min-width:44px;min-height:44px}';
     document.head.appendChild(style);
     const btn = document.createElement('button');
-    btn.className = 'delete-button';
+    btn.className = 'icon-action';
     document.body.appendChild(btn);
     const computed = window.getComputedStyle(btn);
     expect(parseInt(computed.width)).toBeGreaterThanOrEqual(44);
@@ -411,21 +411,64 @@ describe('UX polish pack', () => {
     document.head.removeChild(style);
   });
 
-  it('asset delete button meets 44px touch target', () => {
-    const style = document.createElement('style');
-    style.textContent = '.asset-card__actions .delete-button{width:44px;height:44px}';
-    document.head.appendChild(style);
-    const container = document.createElement('div');
-    container.className = 'asset-card__actions';
-    const btn = document.createElement('button');
-    btn.className = 'delete-button';
-    container.appendChild(btn);
-    document.body.appendChild(container);
-    const computed = window.getComputedStyle(btn);
-    expect(parseInt(computed.width)).toBeGreaterThanOrEqual(44);
-    expect(parseInt(computed.height)).toBeGreaterThanOrEqual(44);
-    document.body.removeChild(container);
-    document.head.removeChild(style);
+  it('asset card shows compact layout with name and current value', async () => {
+    const { AssetsScreen } = await import('../../features/Screens');
+    const wrapper = createTestWrapper();
+    render(<AssetsScreen />, { wrapper });
+    expect(screen.getByText('Acil Yatırım Fonu')).toBeTruthy();
+    expect(screen.getByText('TEFAS / Fon')).toBeTruthy();
+  });
+
+  it('asset card has detail, edit, and delete icon buttons', async () => {
+    const { AssetsScreen } = await import('../../features/Screens');
+    const wrapper = createTestWrapper();
+    render(<AssetsScreen />, { wrapper });
+    expect(screen.getAllByLabelText('Varlık detayı').length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText('Varlığı düzenle').length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText('Varlığı sil').length).toBeGreaterThan(0);
+  });
+
+  it('asset detail sheet opens and shows quantity, unit, unit price', async () => {
+    const { AssetsScreen } = await import('../../features/Screens');
+    const wrapper = createTestWrapper();
+    render(<AssetsScreen />, { wrapper });
+    const detailBtns = screen.getAllByLabelText('Varlık detayı');
+    fireEvent.click(detailBtns[0]);
+    expect(screen.getByText('VARLIK DETAYI')).toBeTruthy();
+    expect(screen.getByText('Miktar')).toBeTruthy();
+    expect(screen.getByText('Birim')).toBeTruthy();
+    expect(screen.getByText('Birim fiyat')).toBeTruthy();
+    expect(screen.getByText('Güncel değer')).toBeTruthy();
+  });
+
+  it('asset card does not show quantity x unitPrice expression', async () => {
+    const { AssetsScreen } = await import('../../features/Screens');
+    const wrapper = createTestWrapper();
+    render(<AssetsScreen />, { wrapper });
+    const gramAltin = screen.getByText('Gram Altın').closest('article');
+    expect(gramAltin).toBeTruthy();
+    expect(gramAltin!.querySelector('.asset-card__detail')).toBeNull();
+  });
+
+  it('asset form has no valuation mode toggle', async () => {
+    const { AssetsScreen } = await import('../../features/Screens');
+    const wrapper = createTestWrapper();
+    render(<AssetsScreen />, { wrapper });
+    fireEvent.click(screen.getByText('Varlık ekle'));
+    expect(screen.queryByText('Değerleme yöntemi')).toBeNull();
+    expect(screen.queryByText('Doğrudan')).toBeNull();
+    expect(screen.queryByText('Miktar × Fiyat')).toBeNull();
+  });
+
+  it('asset form has Miktar, Birim, Birim Fiyat, Güncel Değer fields', async () => {
+    const { AssetsScreen } = await import('../../features/Screens');
+    const wrapper = createTestWrapper();
+    render(<AssetsScreen />, { wrapper });
+    fireEvent.click(screen.getByText('Varlık ekle'));
+    expect(screen.getByText('Miktar')).toBeTruthy();
+    expect(screen.getByText('Birim')).toBeTruthy();
+    expect(screen.getByText('Birim fiyat')).toBeTruthy();
+    expect(screen.getByText('Güncel değer')).toBeTruthy();
   });
 
   it('HomeScreen shows greeting without hardcoded name when no user', async () => {

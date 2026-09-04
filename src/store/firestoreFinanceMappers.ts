@@ -73,10 +73,16 @@ export function fromFirestoreDto<K extends FinanceCollection>(collection: K, id:
       const group = enumValue(data, 'group', ['TEFAS', 'Nasdaq', 'Altın', 'Gümüş', 'BES', 'Nakit', 'Mevduat', 'Kripto', 'Diğer', 'BIST Hisse', 'Döviz', 'Eurobond / Tahvil'] as readonly AssetGroup[]);
       const name = optionalString(data, 'name') ?? '';
       const valuationMode = (data.valuationMode === 'quantity' || data.valuationMode === 'direct') ? data.valuationMode as 'quantity' | 'direct' : 'direct';
-      const quantity = typeof data.quantity === 'number' && Number.isFinite(data.quantity) ? data.quantity : undefined;
-      const unit = (typeof data.unit === 'string' && ['Adet', 'Gram', 'Pay', 'Lot', 'TL', 'USD', 'EUR', 'GBP', 'Ons', 'Diğer'].includes(data.unit)) ? data.unit as AssetUnit : undefined;
-      const unitPrice = typeof data.unitPrice === 'number' && Number.isFinite(data.unitPrice) ? data.unitPrice : undefined;
-      value = { id, userId: uid, group, name, valuationMode, quantity, unit, unitPrice, currentAmount: numberValue(data, 'currentAmount'), targetAmount: numberValue(data, 'targetAmount'), createdAt: metadataNumber(data, 'createdAt'), updatedAt: metadataNumber(data, 'updatedAt') };
+      const cur = numberValue(data, 'currentAmount');
+      let quantity = typeof data.quantity === 'number' && Number.isFinite(data.quantity) ? data.quantity : undefined;
+      let unit = (typeof data.unit === 'string' && ['Adet', 'Gram', 'Pay', 'Lot', 'TL', 'USD', 'EUR', 'GBP', 'Ons', 'Diğer'].includes(data.unit)) ? data.unit as AssetUnit : undefined;
+      let unitPrice = typeof data.unitPrice === 'number' && Number.isFinite(data.unitPrice) ? data.unitPrice : undefined;
+      if (valuationMode === 'direct' && quantity === undefined) {
+        quantity = 1;
+        unit = 'Adet';
+        unitPrice = cur;
+      }
+      value = { id, userId: uid, group, name, valuationMode, quantity, unit, unitPrice, currentAmount: cur, targetAmount: numberValue(data, 'targetAmount'), createdAt: metadataNumber(data, 'createdAt'), updatedAt: metadataNumber(data, 'updatedAt') };
       break;
     }
     case 'goals': value = { id, userId: uid, assetGroupId: stringValue(data, 'assetGroupId'), targetAmount: numberValue(data, 'targetAmount'), createdAt: metadataNumber(data, 'createdAt'), updatedAt: metadataNumber(data, 'updatedAt') }; break;

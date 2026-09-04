@@ -166,20 +166,26 @@ describe('Firestore finance repository', () => {
       expect(domain.currentAmount).toBe(389050);
     });
 
-    it('direct asset round-trips through DTO', () => {
+    it('direct asset round-trips through DTO and normalizes to quantity model', () => {
       const asset = { id: 'a2', group: 'BES' as const, name: 'Allianz BES', valuationMode: 'direct' as const, currentAmount: 64300, targetAmount: 200000, createdAt: 1, updatedAt: 1, userId: uid };
       const dto = toFirestoreDto(asset, deviceId, timestamp);
       const domain = fromFirestoreDto('assets', 'a2', uid, dto as Record<string, unknown>);
       expect(domain.name).toBe('Allianz BES');
       expect(domain.valuationMode).toBe('direct');
+      expect(domain.quantity).toBe(1);
+      expect(domain.unit).toBe('Adet');
+      expect(domain.unitPrice).toBe(64300);
       expect(domain.currentAmount).toBe(64300);
     });
 
-    it('old Firestore document without name/valuationMode loads as direct mode', () => {
+    it('old Firestore document without name/valuationMode normalizes to quantity model', () => {
       const oldDto = { group: 'TEFAS', currentAmount: 132000, targetAmount: 200000, schemaVersion: 2, deviceId: 'old', createdAt: 1, updatedAt: 1, serverUpdatedAt: timestamp };
       const domain = fromFirestoreDto('assets', 'a1', uid, oldDto);
       expect(domain.name).toBe('');
       expect(domain.valuationMode).toBe('direct');
+      expect(domain.quantity).toBe(1);
+      expect(domain.unit).toBe('Adet');
+      expect(domain.unitPrice).toBe(132000);
       expect(domain.currentAmount).toBe(132000);
     });
 

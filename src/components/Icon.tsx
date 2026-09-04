@@ -1,6 +1,6 @@
 import type { SVGProps } from 'react';
 
-export type IconName = 'home' | 'wallet' | 'plus' | 'target' | 'spark' | 'settings' | 'menu' | 'close' | 'arrow' | 'receipt' | 'chart' | 'check' | 'edit' | 'trash' | 'calendar' | 'card';
+export type IconName = 'home' | 'wallet' | 'plus' | 'target' | 'spark' | 'settings' | 'menu' | 'close' | 'arrow' | 'receipt' | 'chart' | 'check' | 'edit' | 'trash' | 'calendar' | 'card' | 'info';
 
 const paths: Record<IconName, React.ReactNode> = {
   home: <><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10M9 20v-6h6v6"/></>,
@@ -13,6 +13,7 @@ const paths: Record<IconName, React.ReactNode> = {
   arrow: <path d="m9 18 6-6-6-6"/>, receipt: <><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/></>,
   chart: <><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></>,   check: <path d="m5 12 4 4L19 6"/>, edit: <><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></>, trash: <><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14"/></>,
   calendar: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/></>, card: <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></>,
+  info: <><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></>,
 };
 
 export function Icon({ name, ...props }: { name: IconName } & SVGProps<SVGSVGElement>) {
