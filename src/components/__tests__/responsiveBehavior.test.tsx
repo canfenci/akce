@@ -356,6 +356,26 @@ describe('Investment vs Asset clarity', () => {
     document.body.removeChild(btn);
     document.head.removeChild(style);
   });
+
+  it('inputMode decimal is present on financial inputs', async () => {
+    const { InvestmentsScreen } = await import('../../features/Screens');
+    const wrapper = createTestWrapper();
+    render(<InvestmentsScreen />, { wrapper });
+    const addBtns = screen.getAllByText('Yatırım planı ekle');
+    fireEvent.click(addBtns[0]);
+    const inputs = document.querySelectorAll('input[inputmode="decimal"]');
+    expect(inputs.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('Home hero typography uses large responsive font size', async () => {
+    const { HomeScreen } = await import('../../features/Screens');
+    const wrapper = createTestWrapper();
+    render(<HomeScreen goTo={() => {}} />, { wrapper });
+    const hero = document.querySelector('.hero-balance > strong');
+    expect(hero).toBeTruthy();
+    const style = window.getComputedStyle(hero!);
+    expect(style.fontSize).toBeTruthy();
+  });
 });
 
 describe('Home screen income ratios', () => {

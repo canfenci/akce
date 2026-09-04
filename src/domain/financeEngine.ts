@@ -196,3 +196,21 @@ export function calculateExpenseRatio(totalIncome: number, totalFixedExpenses: n
 export function formatRatio(value: number): string {
   return value === 0 ? '—' : `%${Math.round(value)}`;
 }
+
+export function parseLocaleNumber(value: string): number | undefined {
+  if (!value || !value.trim()) return undefined;
+  const normalized = value.replace(/\s/g, '').replace(',', '.');
+  if (!/^-?\d*\.?\d+$/.test(normalized)) return undefined;
+  const num = Number(normalized);
+  return Number.isFinite(num) ? num : undefined;
+}
+
+export function sanitizeNumericInput(value: string, allowDecimal = true): string {
+  let result = value.replace(/[^0-9,.\-]/g, '');
+  if (!allowDecimal) return result.replace(/[,.\-]/g, '');
+  const firstSep = result.search(/[,.]/);
+  if (firstSep !== -1) {
+    result = result.slice(0, firstSep + 1) + result.slice(firstSep + 1).replace(/[,.,]/g, '');
+  }
+  return result;
+}

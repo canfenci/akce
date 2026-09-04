@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { calculateMonthSummary, formatCurrency, getMonthKey } from '../domain/financeEngine';
+import { calculateMonthSummary, formatCurrency, getMonthKey, parseLocaleNumber, sanitizeNumericInput } from '../domain/financeEngine';
 import { getMonthCalculationDate } from '../domain/month';
 import type { Expense } from '../domain/types';
 import { useAkceStore } from '../store/AkceStore';
@@ -23,7 +23,7 @@ export function QuickExpenseSheet({ open, onClose, initialCategory = 'Market', i
   const [note, setNote] = useState('');
   const [formError, setFormError] = useState('');
   const summary = useMemo(() => calculateMonthSummary(state.incomes, state.fixedExpenses, state.investments, state.expenses, state.assets, getMonthCalculationDate(state.selectedMonthKey)), [state]);
-  const numericAmount = Number(amount) || 0;
+  const numericAmount = parseLocaleNumber(amount) ?? 0;
   const nextLimit = summary.daysLeft > 0 ? Math.max(0, summary.remainingBudget - numericAmount) / summary.daysLeft : 0;
   const tefas = state.investments.find(item => item.monthKey === state.selectedMonthKey && item.group === 'TEFAS')?.plannedAmount ?? 0;
   const requiresWarning = numericAmount > summary.dailySafeLimit || expenseType === 'plansız';
@@ -55,8 +55,8 @@ export function QuickExpenseSheet({ open, onClose, initialCategory = 'Market', i
     <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="expense-title" ref={sheetRef} style={{ maxHeight: sheetMaxHeight }}>
       <div className="sheet__handle" />
       <header className="sheet__header"><div><span className="eyebrow">YAŞAM KASASI</span><h2 id="expense-title">Hızlı harcama</h2></div><button className="icon-button" onClick={onClose} aria-label="Kapat"><Icon name="close" /></button></header>
-      <label className="amount-input"><span>Tutar</span><div><input autoFocus inputMode="decimal" value={amount} onChange={event => { setAmount(event.target.value.replace(/[^0-9.]/g, '')); setFormError(''); }} placeholder="0" aria-label="Harcama tutarı"/><b>TL</b></div></label>
-      <div className="quick-amounts">{[100, 250, 500, 1000].map(value => <button key={value} type="button" onClick={() => setAmount(String(numericAmount + value))}>+{value}</button>)}</div>
+      <label className="amount-input"><span>Tutar</span><div><input autoFocus inputMode="decimal" value={amount} onChange={event => { setAmount(sanitizeNumericInput(event.target.value)); setFormError(''); }} placeholder="0" aria-label="Harcama tutarı"/><b>TL</b></div></label>
+      <div className="quick-amounts">{[100, 250, 500, 1000].map(value => <button key={value} type="button" onClick={() => setAmount(String((numericAmount || 0) + value))}>+{value}</button>)}</div>
       {hasCategories
         ? <div className="form-grid"><label>Kategori<select aria-label="Kategori" value={validCategory} onChange={e => { setCategory(e.target.value); setFormError(''); }}>{monthCategories.map(item => <option key={item.id}>{item.name}</option>)}</select></label><label>Ödeme<select aria-label="Ödeme" value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as Expense['paymentMethod'])}><option value="kart">Kart</option><option value="nakit">Nakit</option></select></label></div>
         : <div className="form-error">Henüz kategori yok. Bütçeden kategori ekleyin.</div>}

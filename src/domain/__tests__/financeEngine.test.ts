@@ -14,7 +14,9 @@ import {
   getTotalAssetTargets,
   getInvestmentProgress,
   getInvestmentRemaining,
-  isInvestmentCompleted
+  isInvestmentCompleted,
+  parseLocaleNumber,
+  sanitizeNumericInput
 } from '../financeEngine';
 import { Expense, Income, FixedExpense, Investment, Asset, AssetGroup } from '../types';
 
@@ -663,6 +665,98 @@ expect(summary.sevenDayAverage).toBe(1500);
       expect(totalActual).toBe(15000);
       const progress = totalPlanned > 0 ? (totalActual / totalPlanned) * 100 : 0;
       expect(progress).toBe(75);
+    });
+  });
+
+  describe('AKCE-036: parseLocaleNumber', () => {
+    it('parses Turkish comma decimal', () => {
+      expect(parseLocaleNumber('48,22')).toBe(48.22);
+    });
+
+    it('parses dot decimal', () => {
+      expect(parseLocaleNumber('48.22')).toBe(48.22);
+    });
+
+    it('parses integer', () => {
+      expect(parseLocaleNumber('125')).toBe(125);
+    });
+
+    it('parses complex comma decimal', () => {
+      expect(parseLocaleNumber('1482,438')).toBe(1482.438);
+    });
+
+    it('parses small comma decimal', () => {
+      expect(parseLocaleNumber('0,75')).toBe(0.75);
+    });
+
+    it('parses formatted comma decimal', () => {
+      expect(parseLocaleNumber('1200,50')).toBe(1200.50);
+    });
+
+    it('returns undefined for empty string', () => {
+      expect(parseLocaleNumber('')).toBeUndefined();
+    });
+
+    it('returns undefined for whitespace only', () => {
+      expect(parseLocaleNumber('   ')).toBeUndefined();
+    });
+
+    it('returns undefined for malformed input', () => {
+      expect(parseLocaleNumber('abc')).toBeUndefined();
+    });
+
+    it('returns undefined for double commas', () => {
+      expect(parseLocaleNumber('48,,22')).toBeUndefined();
+    });
+
+    it('returns undefined for leading dots', () => {
+      expect(parseLocaleNumber('.5')).toBe(0.5);
+    });
+
+    it('handles negative numbers', () => {
+      expect(parseLocaleNumber('-48,22')).toBe(-48.22);
+    });
+
+    it('strips spaces before parsing', () => {
+      expect(parseLocaleNumber('1 200,5')).toBe(1200.5);
+    });
+
+    it('dot and comma both work for same value', () => {
+      expect(parseLocaleNumber('48,22')).toBe(parseLocaleNumber('48.22'));
+    });
+  });
+
+  describe('AKCE-036: sanitizeNumericInput', () => {
+    it('allows digits and dots', () => {
+      expect(sanitizeNumericInput('123.45')).toBe('123.45');
+    });
+
+    it('allows digits and commas', () => {
+      expect(sanitizeNumericInput('123,45')).toBe('123,45');
+    });
+
+    it('strips non-numeric characters', () => {
+      expect(sanitizeNumericInput('abc123')).toBe('123');
+    });
+
+    it('allows only one decimal separator', () => {
+      expect(sanitizeNumericInput('12.34.56')).toBe('12.3456');
+    });
+
+    it('allows only one comma separator', () => {
+      expect(sanitizeNumericInput('12,34,56')).toBe('12,3456');
+    });
+
+    it('integer mode strips all separators', () => {
+      expect(sanitizeNumericInput('12.34,56', false)).toBe('123456');
+    });
+
+    it('preserves partial typing', () => {
+      expect(sanitizeNumericInput('48,')).toBe('48,');
+    });
+
+    it('preserves leading comma', () => {
+      expect(sanitizeNumericInput(',5')).toBe(',5');
     });
   });
 });

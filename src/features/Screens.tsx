@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { coachProvider } from '../domain/coachEngine';
-import { calculateMonthSummary, calculateInvestmentRatio, calculateExpenseRatio, formatCurrency, formatPercentage, formatRatio, getAssetProgress, getInvestmentProgress, getInvestmentRemaining, isInvestmentCompleted, getMonthKey, getTotalAssets, getTotalAssetTargets } from '../domain/financeEngine';
+import { calculateMonthSummary, calculateInvestmentRatio, calculateExpenseRatio, formatCurrency, formatPercentage, formatRatio, getAssetProgress, getInvestmentProgress, getInvestmentRemaining, isInvestmentCompleted, getMonthKey, getTotalAssets, getTotalAssetTargets, parseLocaleNumber, sanitizeNumericInput } from '../domain/financeEngine';
 import { formatMonthKey, getMonthCalculationDate, shiftMonthKey } from '../domain/month';
 import type { Asset, AssetGroup, AssetUnit, Income, FixedExpense, CategoryBudget, Investment, InvestmentGroup } from '../domain/types';
 import { ASSET_GROUPS, ASSET_GROUP_LABELS, ASSET_UNITS, ASSET_UNIT_LABELS, INVESTMENT_GROUPS, INVESTMENT_GROUP_LABELS } from '../domain/types';
@@ -180,7 +180,7 @@ export function BudgetScreen({ initialTab = 'Genel Bakış', openFormSignal, onF
   };
 
   const saveIncome = () => {
-    const amount = Number(incomeAmount);
+    const amount = parseLocaleNumber(incomeAmount) ?? 0;
     if (!incomeName.trim()) { setIncomeError('Ad boş olamaz.'); return; }
     if (!Number.isFinite(amount) || amount <= 0) { setIncomeError('Tutar 0\'dan büyük olmalı.'); return; }
     const now = Date.now();
@@ -213,8 +213,8 @@ export function BudgetScreen({ initialTab = 'Genel Bakış', openFormSignal, onF
   };
 
   const saveFixed = () => {
-    const amount = Number(fixedAmount);
-    const dueDay = Number(fixedDueDay) || 0;
+    const amount = parseLocaleNumber(fixedAmount) ?? 0;
+    const dueDay = parseLocaleNumber(fixedDueDay) ?? 0;
     if (!fixedName.trim()) { setFixedError('Ad boş olamaz.'); return; }
     if (!Number.isFinite(amount) || amount <= 0) { setFixedError('Tutar 0\'dan büyük olmalı.'); return; }
     if (!Number.isFinite(dueDay) || dueDay < 1 || dueDay > 31) { setFixedError('Ödeme günü 1–31 arasında olmalı.'); return; }
@@ -244,7 +244,7 @@ export function BudgetScreen({ initialTab = 'Genel Bakış', openFormSignal, onF
   };
 
   const saveCategory = () => {
-    const limit = Number(categoryLimit);
+    const limit = parseLocaleNumber(categoryLimit) ?? 0;
     if (!categoryName.trim()) { setCategoryError('Ad boş olamaz.'); return; }
     if (!Number.isFinite(limit) || limit < 0) { setCategoryError('Limit 0 veya daha büyük olmalı.'); return; }
     const payload: CategoryBudget = {
@@ -275,7 +275,7 @@ export function BudgetScreen({ initialTab = 'Genel Bakış', openFormSignal, onF
         <div className="sheet__handle" />
         <header className="sheet__header"><div><span className="eyebrow">GELİR</span><h2 id="income-title">{incomeForm.mode === 'add' ? 'Yeni gelir' : 'Geliri düzenle'}</h2></div><button className="icon-button" onClick={closeIncomeForm} aria-label="Kapat"><Icon name="close" /></button></header>
         <label className="field">Ad <input value={incomeName} onChange={e => { setIncomeName(e.target.value); setIncomeError(''); }} placeholder="Örn: Maaş" /></label>
-        <label className="amount-input"><span>Tutar</span><div><input inputMode="decimal" value={incomeAmount} onChange={e => { setIncomeAmount(e.target.value.replace(/[^0-9.]/g, '')); setIncomeError(''); }} placeholder="0" aria-label="Gelir tutarı" /><b>TL</b></div></label>
+        <label className="amount-input"><span>Tutar</span><div><input inputMode="decimal" value={incomeAmount} onChange={e => { setIncomeAmount(sanitizeNumericInput(e.target.value)); setIncomeError(''); }} placeholder="0" aria-label="Gelir tutarı" /><b>TL</b></div></label>
         <label className="field"><input type="checkbox" checked={incomeRecurring} onChange={e => setIncomeRecurring(e.target.checked)} /> Her ay tekrarlanan gelir</label>
         {incomeError && <p className="form-error">{incomeError}</p>}
         <button className="primary-button" onClick={saveIncome}>{incomeForm.mode === 'add' ? 'Geliri kaydet' : 'Güncelle'}</button>
@@ -287,7 +287,7 @@ export function BudgetScreen({ initialTab = 'Genel Bakış', openFormSignal, onF
         <div className="sheet__handle" />
         <header className="sheet__header"><div><span className="eyebrow">OTOMATİK GİDER</span><h2 id="fixed-title">{fixedForm.mode === 'add' ? 'Yeni otomatik gider' : 'Gideri düzenle'}</h2></div><button className="icon-button" onClick={closeFixedForm} aria-label="Kapat"><Icon name="close" /></button></header>
         <label className="field">Ad <input value={fixedName} onChange={e => { setFixedName(e.target.value); setFixedError(''); }} placeholder="Örn: Netflix" /></label>
-        <label className="amount-input"><span>Tutar</span><div><input inputMode="decimal" value={fixedAmount} onChange={e => { setFixedAmount(e.target.value.replace(/[^0-9.]/g, '')); setFixedError(''); }} placeholder="0" aria-label="Gider tutarı" /><b>TL</b></div></label>
+        <label className="amount-input"><span>Tutar</span><div><input inputMode="decimal" value={fixedAmount} onChange={e => { setFixedAmount(sanitizeNumericInput(e.target.value)); setFixedError(''); }} placeholder="0" aria-label="Gider tutarı" /><b>TL</b></div></label>
         <div className="form-grid"><label>Gün (1-31) <input inputMode="numeric" value={fixedDueDay} onChange={e => { setFixedDueDay(e.target.value.replace(/[^0-9]/g, '')); setFixedError(''); }} /></label><label>Kategori<select value={fixedCategory} onChange={e => setFixedCategory(e.target.value)}>{uniqueCategories.map(c => <option key={c}>{c}</option>)}</select></label></div>
         <fieldset className="segmented"><legend>Sıklık</legend>{(['monthly', 'yearly'] as const).map(value => <button type="button" key={value} className={fixedFrequency === value ? 'active' : ''} onClick={() => setFixedFrequency(value)}>{value === 'monthly' ? 'Aylık' : 'Yıllık'}</button>)}</fieldset>
         {fixedError && <p className="form-error">{fixedError}</p>}
@@ -300,7 +300,7 @@ export function BudgetScreen({ initialTab = 'Genel Bakış', openFormSignal, onF
         <div className="sheet__handle" />
         <header className="sheet__header"><div><span className="eyebrow">KATEGORİ BÜTÇESİ</span><h2 id="category-title">{categoryForm.mode === 'add' ? 'Yeni kategori bütçesi' : 'Kategori bütçesini düzenle'}</h2></div><button className="icon-button" onClick={closeCategoryForm} aria-label="Kapat"><Icon name="close" /></button></header>
         <label className="field">Ad <input value={categoryName} onChange={e => { setCategoryName(e.target.value); setCategoryError(''); }} placeholder="Örn: Market" /></label>
-        <label className="amount-input"><span>Limit</span><div><input inputMode="decimal" value={categoryLimit} onChange={e => { setCategoryLimit(e.target.value.replace(/[^0-9.]/g, '')); setCategoryError(''); }} placeholder="0" aria-label="Kategori limiti" /><b>TL</b></div></label>
+        <label className="amount-input"><span>Limit</span><div><input inputMode="decimal" value={categoryLimit} onChange={e => { setCategoryLimit(sanitizeNumericInput(e.target.value)); setCategoryError(''); }} placeholder="0" aria-label="Kategori limiti" /><b>TL</b></div></label>
         <label className="field">Renk
           <div className="color-swatches">
             {CATEGORY_COLORS.map(hex => <button key={hex} type="button" className={`color-swatch${categoryColor === hex ? ' active' : ''}`} style={{ background: hex }} onClick={() => { setCategoryColor(hex); setCategoryError(''); }} aria-label={hex} />)}
@@ -345,8 +345,8 @@ export function InvestmentsScreen({ openFormSignal, onFormSignalConsumed }: { op
   };
 
   const saveInvestment = () => {
-    const planned = Number(investPlanned);
-    const actual = Number(investActual) || 0;
+    const planned = parseLocaleNumber(investPlanned) ?? 0;
+    const actual = parseLocaleNumber(investActual) ?? 0;
     if (!investName.trim()) { setInvestError('Ad boş olamaz.'); return; }
     if (!Number.isFinite(planned) || planned <= 0) { setInvestError('Planlanan tutar 0\'dan büyük olmalı.'); return; }
     if (!Number.isFinite(actual) || actual < 0) { setInvestError('Gerçekleşen tutar 0 veya daha büyük olmalı.'); return; }
@@ -422,8 +422,8 @@ export function InvestmentsScreen({ openFormSignal, onFormSignalConsumed }: { op
         <header className="sheet__header"><div><span className="eyebrow">YATIRIM</span><h2 id="invest-title">{investForm.mode === 'add' ? 'Yeni yatırım planı' : 'Yatırımı düzenle'}</h2></div><button className="icon-button" onClick={() => setInvestForm({ isOpen: false, mode: 'add' })} aria-label="Kapat"><Icon name="close" /></button></header>
         <label className="field">Tür<select value={investGroup} onChange={e => setInvestGroup(e.target.value as InvestmentGroup)}>{INVESTMENT_GROUPS.map(g => <option key={g} value={g}>{INVESTMENT_GROUP_LABELS[g]}</option>)}</select></label>
         <label className="field">Ad<input value={investName} onChange={e => { setInvestName(e.target.value); setInvestError(''); }} placeholder="Örn: Acil Yatırım Fonu (TP2)" /></label>
-        <label className="amount-input"><span>Planlanan tutar</span><div><input autoFocus inputMode="decimal" value={investPlanned} onChange={e => { setInvestPlanned(e.target.value.replace(/[^0-9.]/g, '')); setInvestError(''); }} placeholder="0" aria-label="Planlanan tutar" /><b>TL</b></div></label>
-        <label className="amount-input"><span>Yatırılan tutar</span><div><input inputMode="decimal" value={investActual} onChange={e => { setInvestActual(e.target.value.replace(/[^0-9.]/g, '')); setInvestError(''); }} placeholder="0" aria-label="Yatırılan tutar" /><b>TL</b></div></label>
+        <label className="amount-input"><span>Planlanan tutar</span><div><input autoFocus inputMode="decimal" value={investPlanned} onChange={e => { setInvestPlanned(sanitizeNumericInput(e.target.value)); setInvestError(''); }} placeholder="0" aria-label="Planlanan tutar" /><b>TL</b></div></label>
+        <label className="amount-input"><span>Yatırılan tutar</span><div><input inputMode="decimal" value={investActual} onChange={e => { setInvestActual(sanitizeNumericInput(e.target.value)); setInvestError(''); }} placeholder="0" aria-label="Yatırılan tutar" /><b>TL</b></div></label>
         {investError && <p className="form-error">{investError}</p>}
         <button className="primary-button" onClick={saveInvestment}>{investForm.mode === 'add' ? 'Yatırım planı ekle' : 'Güncelle'}</button>
       </section>
@@ -477,7 +477,7 @@ export function AssetsScreen({ openFormSignal, onFormSignalConsumed }: { openFor
   const viewportHeight = useVisualViewportHeight();
   const sheetMaxHeight = viewportHeight > 0 ? `${Math.floor(viewportHeight * 0.94)}px` : '94vh';
 
-  const derivedCurrentAmount = valuationMode === 'quantity' ? (Number(quantity) || 0) * (Number(unitPrice) || 0) : Number(currentAmount) || 0;
+  const derivedCurrentAmount = valuationMode === 'quantity' ? (parseLocaleNumber(quantity) ?? 0) * (parseLocaleNumber(unitPrice) ?? 0) : (parseLocaleNumber(currentAmount) ?? 0);
 
   const openAddAsset = () => {
     setAssetGroup('Altın'); setAssetName(''); setValuationMode('direct');
@@ -506,22 +506,22 @@ export function AssetsScreen({ openFormSignal, onFormSignalConsumed }: { openFor
   };
 
   const saveAsset = () => {
-    const tgt = Number(targetAmount);
+    const tgt = parseLocaleNumber(targetAmount);
     if (!assetName.trim()) { setFormError('Ad boş olamaz.'); return; }
-    if (!Number.isFinite(tgt) || tgt < 0) { setFormError('Hedef tutar 0 veya daha büyük olmalı.'); return; }
+    if (tgt === undefined || tgt < 0) { setFormError('Hedef tutar 0 veya daha büyük olmalı.'); return; }
     let cur: number;
     if (valuationMode === 'quantity') {
-      const qty = Number(quantity);
-      const price = Number(unitPrice);
-      if (!Number.isFinite(qty) || qty <= 0) { setFormError('Miktar 0\'dan büyük olmalı.'); return; }
-      if (!Number.isFinite(price) || price < 0) { setFormError('Birim fiyat 0 veya daha büyük olmalı.'); return; }
+      const qty = parseLocaleNumber(quantity);
+      const price = parseLocaleNumber(unitPrice);
+      if (qty === undefined || qty <= 0) { setFormError('Miktar 0\'dan büyük olmalı.'); return; }
+      if (price === undefined || price < 0) { setFormError('Birim fiyat 0 veya daha büyük olmalı.'); return; }
       cur = qty * price;
     } else {
-      cur = Number(currentAmount);
+      cur = parseLocaleNumber(currentAmount) ?? 0;
       if (!Number.isFinite(cur) || cur < 0) { setFormError('Güncel değer 0 veya daha büyük olmalı.'); return; }
     }
     const now = Date.now();
-    const assetPayload = { group: assetGroup, name: assetName.trim(), valuationMode, quantity: valuationMode === 'quantity' ? Number(quantity) : undefined, unit: valuationMode === 'quantity' ? unit : undefined, unitPrice: valuationMode === 'quantity' ? Number(unitPrice) : undefined, currentAmount: cur, targetAmount: tgt };
+    const assetPayload = { group: assetGroup, name: assetName.trim(), valuationMode, quantity: valuationMode === 'quantity' ? parseLocaleNumber(quantity) : undefined, unit: valuationMode === 'quantity' ? unit : undefined, unitPrice: valuationMode === 'quantity' ? parseLocaleNumber(unitPrice) : undefined, currentAmount: cur, targetAmount: tgt };
     if (assetForm.mode === 'edit' && assetForm.currentAsset) {
       dispatch({ type: 'UPDATE_ASSET', id: assetForm.currentAsset.id, amount: cur, targetAmount: tgt, name: assetPayload.name, group: assetPayload.group, valuationMode: assetPayload.valuationMode, quantity: assetPayload.quantity, unit: assetPayload.unit, unitPrice: assetPayload.unitPrice });
     } else {
@@ -583,14 +583,14 @@ export function AssetsScreen({ openFormSignal, onFormSignalConsumed }: { openFor
         <fieldset className="segmented"><legend>Değerleme yöntemi</legend>{(['direct', 'quantity'] as const).map(value => <button type="button" key={value} className={valuationMode === value ? 'active' : ''} onClick={() => { setValuationMode(value); setFormError(''); }}>{value === 'direct' ? 'Doğrudan' : 'Miktar × Fiyat'}</button>)}</fieldset>
         {valuationMode === 'quantity' && <>
           <div className="form-grid">
-            <label className="field">Miktar<input inputMode="decimal" value={quantity} onChange={e => { setQuantity(e.target.value.replace(/[^0-9.]/g, '')); setFormError(''); }} placeholder="0" /></label>
+            <label className="field">Miktar<input inputMode="decimal" value={quantity} onChange={e => { setQuantity(sanitizeNumericInput(e.target.value)); setFormError(''); }} placeholder="0" /></label>
             <label className="field">Birim<select value={unit} onChange={e => setUnit(e.target.value as AssetUnit)}>{ASSET_UNITS.map(u => <option key={u} value={u}>{ASSET_UNIT_LABELS[u]}</option>)}</select></label>
           </div>
-          <label className="amount-input"><span>Birim fiyat</span><div><input inputMode="decimal" value={unitPrice} onChange={e => { setUnitPrice(e.target.value.replace(/[^0-9.]/g, '')); setFormError(''); }} placeholder="0" aria-label="Birim fiyat" /><b>TL</b></div></label>
+          <label className="amount-input"><span>Birim fiyat</span><div><input inputMode="decimal" value={unitPrice} onChange={e => { setUnitPrice(sanitizeNumericInput(e.target.value)); setFormError(''); }} placeholder="0" aria-label="Birim fiyat" /><b>TL</b></div></label>
           <label className="amount-input"><span>Güncel değer</span><div><input value={formatCurrency(derivedCurrentAmount)} readOnly aria-label="Güncel değer" /><b>TL</b></div></label>
         </>}
-        {valuationMode === 'direct' && <label className="amount-input"><span>Güncel değer</span><div><input autoFocus inputMode="decimal" value={currentAmount} onChange={e => { setCurrentAmount(e.target.value.replace(/[^0-9.]/g, '')); setFormError(''); }} placeholder="0" aria-label="Güncel değer" /><b>TL</b></div></label>}
-        <label className="amount-input"><span>Hedef değer (isteğe bağlı)</span><div><input inputMode="decimal" value={targetAmount} onChange={e => { setTargetAmount(e.target.value.replace(/[^0-9.]/g, '')); setFormError(''); }} placeholder="0" aria-label="Hedef değer" /><b>TL</b></div></label>
+        {valuationMode === 'direct' && <label className="amount-input"><span>Güncel değer</span><div><input autoFocus inputMode="decimal" value={currentAmount} onChange={e => { setCurrentAmount(sanitizeNumericInput(e.target.value)); setFormError(''); }} placeholder="0" aria-label="Güncel değer" /><b>TL</b></div></label>}
+        <label className="amount-input"><span>Hedef değer (isteğe bağlı)</span><div><input inputMode="decimal" value={targetAmount} onChange={e => { setTargetAmount(sanitizeNumericInput(e.target.value)); setFormError(''); }} placeholder="0" aria-label="Hedef değer" /><b>TL</b></div></label>
         {formError && <p className="form-error">{formError}</p>}
         <button className="primary-button" onClick={saveAsset}>{assetForm.mode === 'add' ? 'Varlığı kaydet' : 'Güncelle'}</button>
       </section>
