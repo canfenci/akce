@@ -9,6 +9,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { getIsDeviceTrusted, setIsDeviceTrusted } from '../store/devicePreference';
 import { Icon } from '../components/Icon';
 import { Progress } from '../components/Progress';
+import { CardActionMenu } from '../components/CardActionMenu';
 import { useDialogSheet } from '../hooks/useDialogSheet';
 import { useVisualViewportHeight } from '../hooks/useVisualViewportHeight';
 
@@ -328,9 +329,11 @@ export function InvestmentsScreen({ openFormSignal, onFormSignalConsumed }: { op
   const [investActual, setInvestActual] = useState('');
   const [investError, setInvestError] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; investment?: Investment }>({ isOpen: false });
+  const [detailInvestment, setDetailInvestment] = useState<Investment | null>(null);
 
   const investSheetRef = useDialogSheet(investForm.isOpen, () => setInvestForm({ isOpen: false, mode: 'add' }));
   const deleteSheetRef = useDialogSheet(deleteConfirm.isOpen, () => setDeleteConfirm({ isOpen: false }));
+  const detailInvestSheetRef = useDialogSheet(detailInvestment !== null, () => setDetailInvestment(null));
   const viewportHeight = useVisualViewportHeight();
   const sheetMaxHeight = viewportHeight > 0 ? `${Math.floor(viewportHeight * 0.94)}px` : '94vh';
 
@@ -397,6 +400,14 @@ export function InvestmentsScreen({ openFormSignal, onFormSignalConsumed }: { op
         <header className="investment-card__header">
           <span className="asset-monogram">{item.group.slice(0, 2).toLocaleUpperCase('tr-TR')}</span>
           <div><b>{item.name || INVESTMENT_GROUP_LABELS[item.group]}</b><small>{INVESTMENT_GROUP_LABELS[item.group]}</small></div>
+          <CardActionMenu
+            ariaLabel="Yatırım işlemleri"
+            actions={[
+              { label: 'Detayları Gör', icon: 'info', onAction: () => setDetailInvestment(item) },
+              { label: 'Düzenle', icon: 'edit', onAction: () => openEditInvestment(item) },
+              { label: 'Sil', icon: 'trash', destructive: true, onAction: () => openDeleteConfirm(item) },
+            ]}
+          />
         </header>
         <div className="investment-card__amounts">
           <div><span>Planlanan</span><b>{formatCurrency(item.plannedAmount)}</b></div>
@@ -408,10 +419,6 @@ export function InvestmentsScreen({ openFormSignal, onFormSignalConsumed }: { op
             <strong>%{Math.round(progress)}</strong>
             <small>{completed ? 'Tamamlandı' : remaining > 0 ? `${formatCurrency(remaining)} kaldı` : ''}</small>
           </div>
-        </div>
-        <div className="investment-card__actions">
-          <button className="delete-button" onClick={() => openEditInvestment(item)} aria-label="Yatırımı düzenle"><Icon name="edit" /></button>
-          <button className="delete-button" onClick={() => openDeleteConfirm(item)} aria-label="Yatırımı sil"><Icon name="trash" /></button>
         </div>
       </article>;
     })}</section>}
@@ -440,6 +447,27 @@ export function InvestmentsScreen({ openFormSignal, onFormSignalConsumed }: { op
         </div>
       </section>
     </div>}
+
+    {detailInvestment && (() => {
+      const progress = getInvestmentProgress(detailInvestment);
+      const remaining = getInvestmentRemaining(detailInvestment);
+      const completed = isInvestmentCompleted(detailInvestment);
+      return <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setDetailInvestment(null); }}>
+        <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="invest-detail-title" ref={detailInvestSheetRef} style={{ maxHeight: sheetMaxHeight }}>
+          <div className="sheet__handle" />
+          <header className="sheet__header"><div><span className="eyebrow">YATIRIM DETAYI</span><h2 id="invest-detail-title">{detailInvestment.name || INVESTMENT_GROUP_LABELS[detailInvestment.group]}</h2></div><button className="icon-button" onClick={() => setDetailInvestment(null)} aria-label="Kapat"><Icon name="close" /></button></header>
+          <div className="detail-grid">
+            <div className="detail-row"><span>Tür</span><b>{INVESTMENT_GROUP_LABELS[detailInvestment.group]}</b></div>
+            <div className="detail-row"><span>Ad</span><b>{detailInvestment.name || '-'}</b></div>
+            <div className="detail-row"><span>Planlanan tutar</span><b>{formatCurrency(detailInvestment.plannedAmount)}</b></div>
+            <div className="detail-row"><span>Yatırılan tutar</span><b>{formatCurrency(detailInvestment.actualAmount)}</b></div>
+            <div className="detail-row"><span>Kalan tutar</span><b>{formatCurrency(remaining)}</b></div>
+            <div className="detail-row"><span>Gerçekleşme</span><b>%{Math.round(progress)}</b></div>
+            <div className="detail-row"><span>Durum</span><b>{completed ? 'Tamamlandı' : 'Devam ediyor'}</b></div>
+          </div>
+        </section>
+      </div>;
+    })()}
   </div>;
 }
 
@@ -572,11 +600,14 @@ export function AssetsScreen({ openFormSignal, onFormSignalConsumed }: { openFor
               <div><b>{asset.name || ASSET_GROUP_LABELS[asset.group]}</b><small>{ASSET_GROUP_LABELS[asset.group]}</small></div>
             </header>
             <h3>{formatCurrency(asset.currentAmount)}</h3>
-            <div className="asset-card__actions">
-              <button className="icon-action" onClick={() => setDetailAsset(asset)} aria-label="Varlık detayı"><Icon name="info" /></button>
-              <button className="icon-action" onClick={() => openEditAsset(asset)} aria-label="Varlığı düzenle"><Icon name="edit" /></button>
-              <button className="icon-action" onClick={() => openDeleteConfirm(asset)} aria-label="Varlığı sil"><Icon name="trash" /></button>
-            </div>
+            <CardActionMenu
+              ariaLabel="Varlık işlemleri"
+              actions={[
+                { label: 'Detayları Gör', icon: 'info', onAction: () => setDetailAsset(asset) },
+                { label: 'Düzenle', icon: 'edit', onAction: () => openEditAsset(asset) },
+                { label: 'Sil', icon: 'trash', destructive: true, onAction: () => openDeleteConfirm(asset) },
+              ]}
+            />
           </article>
         })}</section>}
 

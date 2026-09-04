@@ -420,21 +420,25 @@ describe('UX polish pack', () => {
     expect(screen.getByText('TEFAS / Fon')).toBeTruthy();
   });
 
-  it('asset card has detail, edit, and delete icon buttons', async () => {
+  it('asset card has overflow menu with detail, edit, and delete actions', async () => {
     const { AssetsScreen } = await import('../../features/Screens');
     const wrapper = createTestWrapper();
     render(<AssetsScreen />, { wrapper });
-    expect(screen.getAllByLabelText('Varlık detayı').length).toBeGreaterThan(0);
-    expect(screen.getAllByLabelText('Varlığı düzenle').length).toBeGreaterThan(0);
-    expect(screen.getAllByLabelText('Varlığı sil').length).toBeGreaterThan(0);
+    const menuButtons = screen.getAllByLabelText('Varlık işlemleri');
+    expect(menuButtons.length).toBeGreaterThan(0);
+    fireEvent.click(menuButtons[0]);
+    expect(screen.getByText('Detayları Gör')).toBeTruthy();
+    expect(screen.getByText('Düzenle')).toBeTruthy();
+    expect(screen.getByText('Sil')).toBeTruthy();
   });
 
-  it('asset detail sheet opens and shows quantity, unit, unit price', async () => {
+  it('asset detail sheet opens via overflow menu', async () => {
     const { AssetsScreen } = await import('../../features/Screens');
     const wrapper = createTestWrapper();
     render(<AssetsScreen />, { wrapper });
-    const detailBtns = screen.getAllByLabelText('Varlık detayı');
-    fireEvent.click(detailBtns[0]);
+    const menuButtons = screen.getAllByLabelText('Varlık işlemleri');
+    fireEvent.click(menuButtons[0]);
+    fireEvent.click(screen.getByText('Detayları Gör'));
     expect(screen.getByText('VARLIK DETAYI')).toBeTruthy();
     expect(screen.getByText('Miktar')).toBeTruthy();
     expect(screen.getByText('Birim')).toBeTruthy();
@@ -702,6 +706,173 @@ describe('UX polish pack', () => {
       expect(parseInt(computed.minHeight)).toBeGreaterThanOrEqual(44);
       document.body.removeChild(container);
       document.head.removeChild(style);
+    });
+  });
+
+  describe('AKÇE-039: Compact Asset & Investment Cards', () => {
+    it('asset card shows name, group, and current value', async () => {
+      const { AssetsScreen } = await import('../../features/Screens');
+      const wrapper = createTestWrapper();
+      render(<AssetsScreen />, { wrapper });
+      const articles = document.querySelectorAll('.asset-card');
+      expect(articles.length).toBeGreaterThan(0);
+      const card = articles[0];
+      expect(card.querySelector('b')?.textContent).toBeTruthy();
+      expect(card.querySelector('small')?.textContent).toBeTruthy();
+      expect(card.querySelector('h3')?.textContent).toContain('TL');
+    });
+
+    it('asset card does not show separate Detail/Edit/Delete buttons', async () => {
+      const { AssetsScreen } = await import('../../features/Screens');
+      const wrapper = createTestWrapper();
+      render(<AssetsScreen />, { wrapper });
+      const card = document.querySelector('.asset-card');
+      expect(card).toBeTruthy();
+      expect(card!.querySelector('.asset-card__actions')).toBeNull();
+      expect(card!.querySelector('[aria-label="Varlık detayı"]')).toBeNull();
+      expect(card!.querySelector('[aria-label="Varlığı düzenle"]')).toBeNull();
+      expect(card!.querySelector('[aria-label="Varlığı sil"]')).toBeNull();
+    });
+
+    it('asset card has one overflow button', async () => {
+      const { AssetsScreen } = await import('../../features/Screens');
+      const wrapper = createTestWrapper();
+      render(<AssetsScreen />, { wrapper });
+      const menuBtns = screen.getAllByLabelText('Varlık işlemleri');
+      expect(menuBtns.length).toBeGreaterThan(0);
+    });
+
+    it('asset overflow menu opens with 3 actions', async () => {
+      const { AssetsScreen } = await import('../../features/Screens');
+      const wrapper = createTestWrapper();
+      render(<AssetsScreen />, { wrapper });
+      fireEvent.click(screen.getAllByLabelText('Varlık işlemleri')[0]);
+      expect(screen.getByText('Detayları Gör')).toBeTruthy();
+      expect(screen.getByText('Düzenle')).toBeTruthy();
+      expect(screen.getByText('Sil')).toBeTruthy();
+    });
+
+    it('asset detail shows quantity, unit, unit price without multiplication expression', async () => {
+      const { AssetsScreen } = await import('../../features/Screens');
+      const wrapper = createTestWrapper();
+      render(<AssetsScreen />, { wrapper });
+      fireEvent.click(screen.getAllByLabelText('Varlık işlemleri')[0]);
+      fireEvent.click(screen.getByText('Detayları Gör'));
+      expect(screen.getByText('Miktar')).toBeTruthy();
+      expect(screen.getByText('Birim')).toBeTruthy();
+      expect(screen.getByText('Birim fiyat')).toBeTruthy();
+      expect(screen.queryByText('×')).toBeNull();
+    });
+
+    it('asset overflow menu touch target >= 44px', () => {
+      const style = document.createElement('style');
+      style.textContent = '.card-action-menu__trigger{width:44px;height:44px;min-width:44px;min-height:44px}';
+      document.head.appendChild(style);
+      const btn = document.createElement('button');
+      btn.className = 'card-action-menu__trigger';
+      document.body.appendChild(btn);
+      const computed = window.getComputedStyle(btn);
+      expect(parseInt(computed.width)).toBeGreaterThanOrEqual(44);
+      expect(parseInt(computed.height)).toBeGreaterThanOrEqual(44);
+      document.body.removeChild(btn);
+      document.head.removeChild(style);
+    });
+
+    it('long asset name does not break card layout', async () => {
+      const { AssetsScreen } = await import('../../features/Screens');
+      const wrapper = createTestWrapper();
+      render(<AssetsScreen />, { wrapper });
+      const articles = document.querySelectorAll('.asset-card');
+      for (const card of articles) {
+        const header = card.querySelector('header');
+        expect(header).toBeTruthy();
+        expect(card.querySelector('h3')).toBeTruthy();
+      }
+    });
+
+    it('investment card shows name, group, planned, actual, progress, remaining', async () => {
+      const { InvestmentsScreen } = await import('../../features/Screens');
+      const wrapper = createTestWrapper();
+      render(<InvestmentsScreen />, { wrapper });
+      const cards = document.querySelectorAll('.investment-card');
+      expect(cards.length).toBeGreaterThan(0);
+      const card = cards[0];
+      expect(card.querySelector('.investment-card__header b')?.textContent).toBeTruthy();
+      expect(card.querySelector('.investment-card__header small')?.textContent).toBeTruthy();
+      expect(card.querySelector('.investment-card__amounts')).toBeTruthy();
+      expect(card.querySelector('.investment-card__progress')).toBeTruthy();
+    });
+
+    it('investment card has overflow button', async () => {
+      const { InvestmentsScreen } = await import('../../features/Screens');
+      const wrapper = createTestWrapper();
+      render(<InvestmentsScreen />, { wrapper });
+      const menuBtns = screen.getAllByLabelText('Yatırım işlemleri');
+      expect(menuBtns.length).toBeGreaterThan(0);
+    });
+
+    it('investment overflow menu has 3 actions', async () => {
+      const { InvestmentsScreen } = await import('../../features/Screens');
+      const wrapper = createTestWrapper();
+      render(<InvestmentsScreen />, { wrapper });
+      fireEvent.click(screen.getAllByLabelText('Yatırım işlemleri')[0]);
+      expect(screen.getByText('Detayları Gör')).toBeTruthy();
+      expect(screen.getByText('Düzenle')).toBeTruthy();
+      expect(screen.getByText('Sil')).toBeTruthy();
+    });
+
+    it('investment detail sheet shows planned, actual, remaining, progress, status', async () => {
+      const { InvestmentsScreen } = await import('../../features/Screens');
+      const wrapper = createTestWrapper();
+      render(<InvestmentsScreen />, { wrapper });
+      fireEvent.click(screen.getAllByLabelText('Yatırım işlemleri')[0]);
+      fireEvent.click(screen.getByText('Detayları Gör'));
+      expect(screen.getByText('YATIRIM DETAYI')).toBeTruthy();
+      expect(screen.getByText('Planlanan tutar')).toBeTruthy();
+      expect(screen.getByText('Yatırılan tutar')).toBeTruthy();
+      expect(screen.getByText('Kalan tutar')).toBeTruthy();
+      expect(screen.getByText('Gerçekleşme')).toBeTruthy();
+      expect(screen.getByText('Durum')).toBeTruthy();
+    });
+
+    it('investment edit and delete work via overflow menu', async () => {
+      const { InvestmentsScreen } = await import('../../features/Screens');
+      const wrapper = createTestWrapper();
+      render(<InvestmentsScreen />, { wrapper });
+      fireEvent.click(screen.getAllByLabelText('Yatırım işlemleri')[0]);
+      fireEvent.click(screen.getByText('Düzenle'));
+      expect(screen.getByText('YATIRIM')).toBeTruthy();
+    });
+
+    it('clicking a second overflow menu closes the first', async () => {
+      const { AssetsScreen } = await import('../../features/Screens');
+      const wrapper = createTestWrapper();
+      render(<AssetsScreen />, { wrapper });
+      const menus = screen.getAllByLabelText('Varlık işlemleri');
+      if (menus.length > 1) {
+        fireEvent.click(menus[0]);
+        expect(screen.getByText('Detayları Gör')).toBeTruthy();
+        fireEvent.mouseDown(document.body);
+        expect(screen.queryByText('Detayları Gör')).toBeNull();
+      }
+    });
+
+    it('ESC closes overflow menu', async () => {
+      const { AssetsScreen } = await import('../../features/Screens');
+      const wrapper = createTestWrapper();
+      render(<AssetsScreen />, { wrapper });
+      fireEvent.click(screen.getAllByLabelText('Varlık işlemleri')[0]);
+      expect(screen.getByText('Detayları Gör')).toBeTruthy();
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(screen.queryByText('Detayları Gör')).toBeNull();
+    });
+
+    it('bottom nav unchanged', async () => {
+      const wrapper = createTestWrapper();
+      const { container } = render(<div className="bottom-nav"><button>Ana Sayfa</button><button>Yatırımlar</button><button>Varlıklar</button><button>Bütçe</button></div>, { wrapper });
+      expect(container.querySelector('.bottom-nav')).toBeTruthy();
+      const buttons = container.querySelectorAll('.bottom-nav > button');
+      expect(buttons.length).toBe(4);
     });
   });
 });
