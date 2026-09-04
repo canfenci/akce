@@ -1,8 +1,8 @@
-import type { FinanceCollectionMap, FinanceMutation, FinanceSubscriptionUpdate, RealtimeFinanceRepository } from './financeRepository';
+import type { FinanceCollectionMap, FinanceMutation, FinanceSubscriptionUpdate, MarketRatesData, RealtimeFinanceRepository } from './financeRepository';
 import { FinanceRepositoryError } from './financeRepository';
 import { fromFirestoreDto, toFirestoreDto } from './firestoreFinanceMappers';
 import { createFirestoreGateway, type FirestoreGateway, type GatewayBatchOperation } from './firestoreGateway';
-import { globalCollectionPath, globalDocumentPath, monthPath, monthlyCollectionPath, monthlyDocumentPath } from './firestorePaths';
+import { globalCollectionPath, globalDocumentPath, marketRatesPath, monthPath, monthlyCollectionPath, monthlyDocumentPath } from './firestorePaths';
 import type { FirestoreCacheMode } from '../firebase/firebaseFirestore';
 
 const deviceStorageKey = 'akce-v1-device-id';
@@ -86,6 +86,33 @@ export class FirebaseFinanceRepository implements RealtimeFinanceRepository {
     return this.subscribeCollections(uid, globalCollections, collection => globalCollectionPath(uid, collection), onUpdate, onError);
   }
 
+  subscribeMarketRates(uid: string, onUpdate: (rates: MarketRatesData) => void, onError: (error: FinanceRepositoryError) => void) {
+    const path = marketRatesPath(uid);
+    const unsubscribeGateway = this.gateway.subscribeDocument(path, document => {
+      try {
+        const data = document?.data ?? {};
+        const rates: MarketRatesData = {};
+        for (const [key, value] of Object.entries(data)) {
+          if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
+            rates[key] = value;
+          }
+        }
+        onUpdate(rates);
+      } catch (error) {
+        onError(normalizeRepositoryError(error));
+      }
+    }, error => onError(normalizeRepositoryError(error)));
+    let active = true;
+    const unsubscribe = () => {
+      if (!active) return;
+      active = false;
+      unsubscribeGateway();
+      this.activeListeners.delete(unsubscribe);
+    };
+    this.activeListeners.add(unsubscribe);
+    return unsubscribe;
+  }
+
   private dto(value: FinanceCollectionMap[keyof FinanceCollectionMap]) {
     return toFirestoreDto(value, this.deviceId, this.gateway.serverTimestamp());
   }
@@ -117,6 +144,25 @@ export class FirebaseFinanceRepository implements RealtimeFinanceRepository {
         case 'asset.update': await this.gateway.updateDocument(globalDocumentPath(uid, 'assets', mutation.value.id), this.updateDto(mutation.value)); break;
         case 'asset.create': await this.gateway.setDocument(globalDocumentPath(uid, 'assets', mutation.value.id), this.dto(mutation.value)); break;
         case 'asset.delete': await this.gateway.deleteDocument(globalDocumentPath(uid, 'assets', mutation.id)); break;
+        case 'marketRates.update': {
+          const now = Date.now();
+          const ratesData: Record<string, unknown> = {};
+          for (const [key, value] of Object.entries(mutation.rates)) {
+            ratesData[key] = value;
+          }
+          await this.gateway.setDocument(marketRatesPath(uid), {
+            ...ratesData,
+            schemaVersion: 2,
+            deviceId: this.deviceId,
+            updatedAt: now,
+            createdAt: now,
+            serverUpdatedAt: this.gateway.serverTimestamp(),
+          }, true);
+          for (const asset of mutation.assets) {
+            await this.gateway.updateDocument(globalDocumentPath(uid, 'assets', asset.id), this.updateDto(asset));
+          }
+          break;
+        }
         case 'month.initialize': {
           const now = Date.now();
           const operations: GatewayBatchOperation[] = [{ type: 'set', path: monthPath(uid, mutation.value.monthKey), data: { monthKey: mutation.value.monthKey, schemaVersion: 2, deviceId: this.deviceId, createdAt: now, updatedAt: now, serverUpdatedAt: this.gateway.serverTimestamp() }, merge: true }];

@@ -214,3 +214,13 @@ export function sanitizeNumericInput(value: string, allowDecimal = true): string
   }
   return result;
 }
+
+export function revalueAsset(asset: Asset, rates: Record<string, number>): Asset {
+  if (asset.priceSource !== 'rate' || !asset.rateKey) return asset;
+  const rate = rates[asset.rateKey];
+  if (rate === undefined || rate === null || !Number.isFinite(rate) || rate < 0) return asset;
+  const qty = asset.quantity ?? 0;
+  const unitPrice = rate;
+  const currentAmount = qty * unitPrice;
+  return { ...asset, unitPrice, currentAmount, updatedAt: Date.now() };
+}

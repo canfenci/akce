@@ -32,6 +32,7 @@ class SimpleGateway implements FirestoreGateway {
     this.subscriptions.push({ path, onDocuments });
     return () => {};
   }
+  subscribeDocument(_path: string, _onDocument: (doc: { id: string; data: Record<string, unknown> } | null) => void, _onError: (error: unknown) => void) { return () => {}; }
   serverTimestamp(): unknown { return Date.now(); }
 }
 

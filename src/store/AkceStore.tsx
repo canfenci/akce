@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type Dispatch, type ReactNode } from 'react';
-import type { Asset, AssetGroup, Expense, Income, FixedExpense, CategoryBudget, Investment } from '../domain/types';
+import type { Asset, AssetGroup, Expense, Income, FixedExpense, CategoryBudget, Investment, MarketRates } from '../domain/types';
 import { seedData, type AkceData } from './seed';
 import { localStorageFinanceRepository, storageKey, emptyFinanceState } from './localStorageFinanceRepository';
 import { createFirebaseFinanceRepository } from './firebaseFinanceRepository';
@@ -8,6 +8,7 @@ import { FinanceSyncCoordinator, type SyncStatus } from './financeSyncCoordinato
 import { getFirebaseErrorDetails, type FinanceMutation, type FinanceSubscriptionUpdate } from './financeRepository';
 import { getPreferredCacheMode } from './devicePreference';
 import { useAuth } from '../auth/AuthProvider';
+import { revalueAsset } from '../domain/financeEngine';
 
 export type Action =
   | { type: 'ADD_EXPENSE'; payload: Expense }
@@ -17,7 +18,7 @@ export type Action =
   | { type: 'DELETE_INCOME'; id: string }
   | { type: 'TOGGLE_FIXED'; id: string }
   | { type: 'TOGGLE_INVESTMENT'; id: string }
-  | { type: 'UPDATE_ASSET'; id: string; amount: number; targetAmount?: number; name?: string; group?: AssetGroup; valuationMode?: Asset['valuationMode']; quantity?: number; unit?: Asset['unit']; unitPrice?: number }
+  | { type: 'UPDATE_ASSET'; id: string; amount: number; targetAmount?: number; name?: string; group?: AssetGroup; valuationMode?: Asset['valuationMode']; quantity?: number; unit?: Asset['unit']; unitPrice?: number; priceSource?: Asset['priceSource']; rateKey?: Asset['rateKey'] }
   | { type: 'ADD_ASSET'; payload: Asset }
   | { type: 'DELETE_ASSET'; id: string }
   | { type: 'ADD_INVESTMENT'; payload: Investment }
@@ -36,7 +37,10 @@ export type Action =
   | { type: 'RESET' }
   | { type: 'RESET_FINANCE_DATA' }
   | { type: 'SYNC_HYDRATE_STATE'; state: AkceData }
-  | { type: 'SYNC_SUBSCRIPTION_UPDATE'; update: FinanceSubscriptionUpdate };
+  | { type: 'SYNC_SUBSCRIPTION_UPDATE'; update: FinanceSubscriptionUpdate }
+  | { type: 'SYNC_MARKET_RATES_UPDATE'; rates: Record<string, number> }
+  | { type: 'UPDATE_MARKET_RATES'; payload: MarketRates }
+  | { type: 'REVALUE_ASSETS' };
 
 const copyId = (id: string, monthKey: string) => `${id.split('@')[0]}@${monthKey}`;
 
@@ -93,7 +97,7 @@ export function reducer(state: AkceData, action: Action): AkceData {
     case 'SET_SELECTED_MONTH': return { ...state, selectedMonthKey: action.monthKey };
     case 'INITIALIZE_MONTH': return initializeMonth(state, action.sourceMonthKey, action.targetMonthKey);
     case 'TOGGLE_INVESTMENT': return { ...state, investments: state.investments.map(item => item.id === action.id ? { ...item, completed: !item.completed, actualAmount: item.completed ? 0 : item.plannedAmount, completedDate: item.completed ? undefined : new Date().toISOString().slice(0, 10), updatedAt: Date.now() } : item) };
-    case 'UPDATE_ASSET': return { ...state, assets: state.assets.map(item => item.id === action.id ? { ...item, currentAmount: Math.max(0, action.amount), targetAmount: action.targetAmount !== undefined ? Math.max(0, action.targetAmount) : item.targetAmount, name: action.name ?? item.name, group: action.group ?? item.group, valuationMode: action.valuationMode ?? item.valuationMode, quantity: action.quantity !== undefined ? action.quantity : item.quantity, unit: action.unit ?? item.unit, unitPrice: action.unitPrice !== undefined ? action.unitPrice : item.unitPrice, updatedAt: Date.now() } : item) };
+    case 'UPDATE_ASSET': return { ...state, assets: state.assets.map(item => item.id === action.id ? { ...item, currentAmount: Math.max(0, action.amount), targetAmount: action.targetAmount !== undefined ? Math.max(0, action.targetAmount) : item.targetAmount, name: action.name ?? item.name, group: action.group ?? item.group, valuationMode: action.valuationMode ?? item.valuationMode, priceSource: action.priceSource ?? item.priceSource, rateKey: action.rateKey !== undefined ? action.rateKey : item.rateKey, quantity: action.quantity !== undefined ? action.quantity : item.quantity, unit: action.unit ?? item.unit, unitPrice: action.unitPrice !== undefined ? action.unitPrice : item.unitPrice, updatedAt: Date.now() } : item) };
     case 'ADD_ASSET': return { ...state, assets: [action.payload, ...state.assets] };
     case 'DELETE_ASSET': return { ...state, assets: state.assets.filter(item => item.id !== action.id) };
     case 'ADD_INVESTMENT': return { ...state, investments: [action.payload, ...state.investments] };
@@ -101,8 +105,22 @@ export function reducer(state: AkceData, action: Action): AkceData {
     case 'DELETE_INVESTMENT': return { ...state, investments: state.investments.filter(item => item.id !== action.id) };
     case 'SET_ONBOARDING': return { ...state, settings: { ...state.settings, showOnboarding: action.value, updatedAt: Date.now() } };
     case 'RESET': return { ...seedData, settings: { ...seedData.settings, showOnboarding: false } };
-    case 'RESET_FINANCE_DATA': return { ...emptyFinanceState, selectedMonthKey: state.selectedMonthKey };
+    case 'RESET_FINANCE_DATA': return { ...emptyFinanceState, selectedMonthKey: state.selectedMonthKey, marketRates: {} };
     case 'SYNC_HYDRATE_STATE': return action.state;
+    case 'UPDATE_MARKET_RATES': {
+      const ratesRecord: Record<string, number> = {};
+      for (const [key, value] of Object.entries(action.payload)) {
+        if (typeof value === 'number' && Number.isFinite(value)) {
+          ratesRecord[key] = value;
+        }
+      }
+      return { ...state, marketRates: ratesRecord };
+    }
+    case 'SYNC_MARKET_RATES_UPDATE': return { ...state, marketRates: action.rates };
+    case 'REVALUE_ASSETS': {
+      if (!state.marketRates || Object.keys(state.marketRates).length === 0) return state;
+      return { ...state, assets: state.assets.map(a => revalueAsset(a, state.marketRates!)) };
+    }
     case 'SYNC_SUBSCRIPTION_UPDATE': {
       const { collection, items } = action.update;
       if (collection === 'assets' || collection === 'goals' || collection === 'assetSnapshots') {
@@ -177,7 +195,7 @@ export function mapActionToMutation(action: Action, currentState: AkceData): Fin
     }
     case 'UPDATE_ASSET': {
       const item = currentState.assets.find(a => a.id === action.id);
-      return item ? { type: 'asset.update', value: { ...item, currentAmount: Math.max(0, action.amount), targetAmount: action.targetAmount !== undefined ? Math.max(0, action.targetAmount) : item.targetAmount, name: action.name ?? item.name, group: action.group ?? item.group, valuationMode: action.valuationMode ?? item.valuationMode, quantity: action.quantity !== undefined ? action.quantity : item.quantity, unit: action.unit ?? item.unit, unitPrice: action.unitPrice !== undefined ? action.unitPrice : item.unitPrice, updatedAt: Date.now() } } : null;
+      return item ? { type: 'asset.update', value: { ...item, currentAmount: Math.max(0, action.amount), targetAmount: action.targetAmount !== undefined ? Math.max(0, action.targetAmount) : item.targetAmount, name: action.name ?? item.name, group: action.group ?? item.group, valuationMode: action.valuationMode ?? item.valuationMode, priceSource: action.priceSource ?? item.priceSource, rateKey: action.rateKey !== undefined ? action.rateKey : item.rateKey, quantity: action.quantity !== undefined ? action.quantity : item.quantity, unit: action.unit ?? item.unit, unitPrice: action.unitPrice !== undefined ? action.unitPrice : item.unitPrice, updatedAt: Date.now() } } : null;
     }
     case 'ADD_ASSET': return { type: 'asset.create', value: action.payload };
     case 'DELETE_ASSET': return { type: 'asset.delete', id: action.id };
@@ -198,6 +216,35 @@ export function mapActionToMutation(action: Action, currentState: AkceData): Fin
           investments: nextState.investments.filter(i => i.monthKey === action.targetMonthKey),
           categoryBudgets: nextState.categoryBudgets.filter(c => c.monthKey === action.targetMonthKey),
         },
+      };
+    }
+    case 'UPDATE_MARKET_RATES': {
+      const ratesRecord: Record<string, number> = {};
+      for (const [key, value] of Object.entries(action.payload)) {
+        if (typeof value === 'number' && Number.isFinite(value)) {
+          ratesRecord[key] = value;
+        }
+      }
+      const revalued = currentState.assets.map(a => {
+        if (a.priceSource !== 'rate' || !a.rateKey) return a;
+        const rate = ratesRecord[a.rateKey];
+        if (rate === undefined || rate === null || !Number.isFinite(rate) || rate < 0) return a;
+        const qty = a.quantity ?? 0;
+        return { ...a, unitPrice: rate, currentAmount: qty * rate, updatedAt: Date.now() };
+      });
+      return {
+        type: 'marketRates.update',
+        rates: ratesRecord,
+        assets: revalued,
+      };
+    }
+    case 'REVALUE_ASSETS': {
+      if (!currentState.marketRates || Object.keys(currentState.marketRates).length === 0) return null;
+      const revalued = currentState.assets.map(a => revalueAsset(a, currentState.marketRates!));
+      return {
+        type: 'marketRates.update',
+        rates: currentState.marketRates!,
+        assets: revalued,
       };
     }
     default: return null;
@@ -235,6 +282,7 @@ export function AkceStoreProvider({
       onSyncStatusChange: setSyncStatus,
       onHydrateState: nextState => rawDispatch({ type: 'SYNC_HYDRATE_STATE', state: nextState }),
       onSubscriptionUpdate: update => rawDispatch({ type: 'SYNC_SUBSCRIPTION_UPDATE', update }),
+      onMarketRatesUpdate: rates => rawDispatch({ type: 'SYNC_MARKET_RATES_UPDATE', rates }),
       onError: error => {
         if (import.meta.env.DEV) {
           console.error('[AKÇE Firestore sync]', getFirebaseErrorDetails(error));

@@ -28,6 +28,8 @@ export type FinanceSubscriptionUpdate<K extends FinanceCollection = FinanceColle
   items: FinanceCollectionMap[K][];
 };
 
+export type MarketRatesData = Record<string, number>;
+
 export interface MonthInitializationPayload {
   monthKey: string;
   incomes: Income[];
@@ -56,12 +58,14 @@ export type FinanceMutation =
   | { type: 'asset.update'; value: Asset }
   | { type: 'asset.create'; value: Asset }
   | { type: 'asset.delete'; id: string }
-  | { type: 'month.initialize'; value: MonthInitializationPayload };
+  | { type: 'month.initialize'; value: MonthInitializationPayload }
+  | { type: 'marketRates.update'; rates: MarketRatesData; assets: Asset[] };
 
 export interface RealtimeFinanceRepository extends FinanceRepository {
   readonly kind: 'firestore';
   subscribeSelectedMonth(uid: string, monthKey: string, onUpdate: (update: FinanceSubscriptionUpdate) => void, onError: (error: FinanceRepositoryError) => void): () => void;
   subscribeGlobals(uid: string, onUpdate: (update: FinanceSubscriptionUpdate) => void, onError: (error: FinanceRepositoryError) => void): () => void;
+  subscribeMarketRates(uid: string, onUpdate: (rates: MarketRatesData) => void, onError: (error: FinanceRepositoryError) => void): () => void;
   applyMutation(uid: string, mutation: FinanceMutation): Promise<void>;
   dispose(): void;
 }

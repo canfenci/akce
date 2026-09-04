@@ -88,6 +88,7 @@ class MemoryFirestoreGateway implements FirestoreGateway {
     this.subscriptions.push({ path, onDocuments, unsubscribe });
     return unsubscribe;
   }
+  subscribeDocument(_path: string, _onDocument: (doc: { id: string; data: Record<string, unknown> } | null) => void, _onError: (error: unknown) => void) { return () => {}; }
 
   serverTimestamp(): unknown {
     return { serverTimestamp: Date.now() };

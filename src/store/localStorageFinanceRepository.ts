@@ -39,6 +39,7 @@ export const emptyFinanceState: AkceData = {
   assets: [],
   goals: [],
   assetSnapshots: [],
+  marketRates: {},
   settings: { ...seedData.settings, showOnboarding: false },
 };
 
@@ -57,9 +58,16 @@ export function migrateState(input: unknown, currentMonthKey: string = getMonthK
     fixedExpenses: normalizeMonth(legacy.fixedExpenses),
     investments: normalizeMonth(legacy.investments),
     categoryBudgets: normalizeMonth(legacy.categoryBudgets),
-    assets: Array.isArray(legacy.assets) ? legacy.assets : [],
+    assets: Array.isArray(legacy.assets)
+      ? legacy.assets.map(a => ({
+          ...a,
+          priceSource: a.priceSource ?? 'manual',
+          rateKey: a.rateKey,
+        }))
+      : [],
     goals: Array.isArray(legacy.goals) ? legacy.goals : [],
     assetSnapshots: Array.isArray(legacy.assetSnapshots) ? legacy.assetSnapshots : [],
+    marketRates: (legacy.marketRates && typeof legacy.marketRates === 'object') ? legacy.marketRates as Record<string, number> : {},
     settings: legacy.settings ?? cloneSeed().settings,
   };
 }

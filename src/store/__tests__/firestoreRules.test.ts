@@ -87,6 +87,20 @@ function evaluateRules(context: EvaluationContext): { allowed: boolean; reason?:
     return { allowed: true };
   }
 
+  // Market rates: users/{uid}/marketRates/current
+  if (parts[2] === 'marketRates' && parts[3] === 'current') {
+    if (operation === 'read' || operation === 'delete') return { allowed: true };
+    const data = request.resource?.data ?? {};
+    if (data.schemaVersion !== 2) return { allowed: false, reason: 'invalid-schema-version' };
+    const validRateKeys = ['USD_TRY', 'EUR_TRY', 'GOLD_GRAM_TRY', 'SILVER_GRAM_TRY', 'QUARTER_GOLD_TRY', 'REPUBLIC_GOLD_TRY', 'GOLD_22K_GRAM_TRY'];
+    for (const key of Object.keys(data)) {
+      if (key === 'schemaVersion' || key === 'deviceId' || key === 'updatedAt' || key === 'createdAt' || key === 'serverUpdatedAt') continue;
+      if (!validRateKeys.includes(key)) return { allowed: false, reason: 'invalid-rate-key' };
+      if (typeof data[key] !== 'number' || data[key] < 0) return { allowed: false, reason: 'negative-amount' };
+    }
+    return { allowed: true };
+  }
+
   // Monthly subcollections: users/{uid}/months/{monthKey}
   if (parts[2] === 'months') {
     if (parts.length === 3 && operation === 'list') {
@@ -472,7 +486,7 @@ describe('Firestore Security Rules verification', () => {
     expect(res.allowed).toBe(false);
   });
 
-  // 9. public root → DENY
+  // Public root → DENY
   it('9. denies access to public root collections', () => {
     const res = evaluateRules({
       request: { auth: { uid: 'user-1' } },
@@ -526,5 +540,99 @@ describe('Firestore Security Rules verification', () => {
     });
     expect(res.allowed).toBe(false);
     expect(res.reason).toBe('invalid-schema-version');
+  });
+
+  describe('AKÇE-038: market rates rules', () => {
+    it('allows owner to read market rates', () => {
+      const res = evaluateRules({
+        request: { auth: { uid: 'user-1' } },
+        path: 'users/user-1/marketRates/current',
+        operation: 'read',
+      });
+      expect(res.allowed).toBe(true);
+    });
+
+    it('allows owner to write valid market rates', () => {
+      const res = evaluateRules({
+        request: {
+          auth: { uid: 'user-1' },
+          resource: {
+            data: { schemaVersion: 2, USD_TRY: 38.5, GOLD_GRAM_TRY: 3200 },
+          },
+        },
+        path: 'users/user-1/marketRates/current',
+        operation: 'create',
+      });
+      expect(res.allowed).toBe(true);
+    });
+
+    it('allows owner to delete market rates', () => {
+      const res = evaluateRules({
+        request: { auth: { uid: 'user-1' } },
+        path: 'users/user-1/marketRates/current',
+        operation: 'delete',
+      });
+      expect(res.allowed).toBe(true);
+    });
+
+    it('denies non-owner from reading market rates', () => {
+      const res = evaluateRules({
+        request: { auth: { uid: 'attacker-uid' } },
+        path: 'users/user-1/marketRates/current',
+        operation: 'read',
+      });
+      expect(res.allowed).toBe(false);
+    });
+
+    it('denies unauthenticated read of market rates', () => {
+      const res = evaluateRules({
+        request: { auth: null },
+        path: 'users/user-1/marketRates/current',
+        operation: 'read',
+      });
+      expect(res.allowed).toBe(false);
+    });
+
+    it('denies market rates with invalid schemaVersion', () => {
+      const res = evaluateRules({
+        request: {
+          auth: { uid: 'user-1' },
+          resource: {
+            data: { schemaVersion: 1, USD_TRY: 38.5 },
+          },
+        },
+        path: 'users/user-1/marketRates/current',
+        operation: 'create',
+      });
+      expect(res.allowed).toBe(false);
+    });
+
+    it('denies market rates with negative values', () => {
+      const res = evaluateRules({
+        request: {
+          auth: { uid: 'user-1' },
+          resource: {
+            data: { schemaVersion: 2, USD_TRY: -5 },
+          },
+        },
+        path: 'users/user-1/marketRates/current',
+        operation: 'create',
+      });
+      expect(res.allowed).toBe(false);
+    });
+
+    it('allows market rates with only schemaVersion (empty rates)', () => {
+      const res = evaluateRules({
+        request: {
+          auth: { uid: 'user-1' },
+          resource: {
+            data: { schemaVersion: 2 },
+          },
+        },
+        path: 'users/user-1/marketRates/current',
+        operation: 'create',
+      });
+      expect(res.allowed).toBe(true);
+    });
   });
 });

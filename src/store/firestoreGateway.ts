@@ -13,6 +13,7 @@ export type GatewayBatchOperation =
 
 export interface FirestoreGateway {
   subscribeCollection(path: string, onDocuments: (documents: GatewayDocument[]) => void, onError: (error: unknown) => void): () => void;
+  subscribeDocument(path: string, onDocument: (document: GatewayDocument | null) => void, onError: (error: unknown) => void): () => void;
   getDocument?(path: string): Promise<GatewayDocument | null>;
   getDocuments?(path: string): Promise<GatewayDocument[]>;
   setDocument(path: string, data: Record<string, unknown>, merge?: boolean): Promise<void>;
@@ -27,6 +28,11 @@ export function createFirestoreGateway(cacheMode: FirestoreCacheMode = 'memory')
   return {
     subscribeCollection(path, onDocuments, onError) {
       return onSnapshot(collection(firestore, path), snapshot => onDocuments(snapshot.docs.map(item => ({ id: item.id, data: item.data() }))), onError);
+    },
+    subscribeDocument(path, onDocument, onError) {
+      return onSnapshot(doc(firestore, path), snapshot => {
+        onDocument(snapshot.exists() ? { id: snapshot.id, data: snapshot.data() as Record<string, unknown> } : null);
+      }, onError);
     },
     async getDocument(path) {
       const snapshot = await getDoc(doc(firestore, path));

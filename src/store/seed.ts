@@ -22,6 +22,7 @@ export interface AkceData {
   goals: Goal[];
   categoryBudgets: CategoryBudget[];
   assetSnapshots: AssetSnapshot[];
+  marketRates?: Record<string, number>;
   settings: UserSettings;
 }
 
@@ -52,11 +53,11 @@ export const seedData: AkceData = {
     { id: 'expense-4', amount: 900, category: 'Diğer', type: 'plansız', paymentMethod: 'nakit', note: 'Beklenmedik ihtiyaç', date: dateAgo(2), monthKey, ...common },
   ],
   assets: [
-    { id: 'asset-1', group: 'TEFAS', name: 'Acil Yatırım Fonu', valuationMode: 'quantity', quantity: 1, unit: 'Adet', unitPrice: 132000, currentAmount: 132000, targetAmount: 200000, ...common },
-    { id: 'asset-2', group: 'Nasdaq', name: 'NASDAQ 100 ETF', valuationMode: 'quantity', quantity: 1, unit: 'Adet', unitPrice: 185000, currentAmount: 185000, targetAmount: 250000, ...common },
-    { id: 'asset-3', group: 'Altın', name: 'Gram Altın', valuationMode: 'quantity', quantity: 24, unit: 'Gram', unitPrice: 3083, currentAmount: 73992, targetAmount: 150000, ...common },
-    { id: 'asset-4', group: 'Gümüş', name: 'Gümüş Fonu', valuationMode: 'quantity', quantity: 1, unit: 'Adet', unitPrice: 24000, currentAmount: 24000, targetAmount: 100000, ...common },
-    { id: 'asset-5', group: 'BES', name: 'Allianz BES', valuationMode: 'quantity', quantity: 1, unit: 'Adet', unitPrice: 56000, currentAmount: 56000, targetAmount: 300000, ...common },
+    { id: 'asset-1', group: 'TEFAS', name: 'Acil Yatırım Fonu', valuationMode: 'quantity', priceSource: 'manual', quantity: 1, unit: 'Adet', unitPrice: 132000, currentAmount: 132000, targetAmount: 200000, ...common },
+    { id: 'asset-2', group: 'Nasdaq', name: 'NASDAQ 100 ETF', valuationMode: 'quantity', priceSource: 'manual', quantity: 1, unit: 'Adet', unitPrice: 185000, currentAmount: 185000, targetAmount: 250000, ...common },
+    { id: 'asset-3', group: 'Altın', name: 'Gram Altın', valuationMode: 'quantity', priceSource: 'manual', quantity: 24, unit: 'Gram', unitPrice: 3083, currentAmount: 73992, targetAmount: 150000, ...common },
+    { id: 'asset-4', group: 'Gümüş', name: 'Gümüş Fonu', valuationMode: 'quantity', priceSource: 'manual', quantity: 1, unit: 'Adet', unitPrice: 24000, currentAmount: 24000, targetAmount: 100000, ...common },
+    { id: 'asset-5', group: 'BES', name: 'Allianz BES', valuationMode: 'quantity', priceSource: 'manual', quantity: 1, unit: 'Adet', unitPrice: 56000, currentAmount: 56000, targetAmount: 300000, ...common },
   ],
   goals: [{ id: 'goal-1', assetGroupId: 'freedom', targetAmount: 1000000, ...common }],
   categoryBudgets: [
@@ -66,5 +67,6 @@ export const seedData: AkceData = {
     { id: 'cat-4', name: 'Diğer', limit: 3500, color: '#777d76', monthKey },
   ],
   assetSnapshots: [],
+  marketRates: {},
   settings: { currency: 'TL', monthStartDay: 1, showOnboarding: true, ...common },
 };

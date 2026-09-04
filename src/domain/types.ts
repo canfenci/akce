@@ -115,6 +115,8 @@ export interface Asset {
   group: AssetGroup;
   name: string;
   valuationMode: ValuationMode;
+  priceSource?: PriceSource;
+  rateKey?: MarketRateKey;
   quantity?: number;
   unit?: AssetUnit;
   unitPrice?: number;
@@ -201,3 +203,33 @@ export interface AssetSnapshot {
   amount: number;
   createdAt: number;
 }
+
+export type MarketRateKey = 'USD_TRY' | 'EUR_TRY' | 'GOLD_GRAM_TRY' | 'SILVER_GRAM_TRY' | 'QUARTER_GOLD_TRY' | 'REPUBLIC_GOLD_TRY' | 'GOLD_22K_GRAM_TRY';
+
+export const MARKET_RATE_KEYS: MarketRateKey[] = ['USD_TRY', 'EUR_TRY', 'GOLD_GRAM_TRY', 'SILVER_GRAM_TRY', 'QUARTER_GOLD_TRY', 'REPUBLIC_GOLD_TRY', 'GOLD_22K_GRAM_TRY'];
+
+export const MARKET_RATE_LABELS: Record<MarketRateKey, string> = {
+  USD_TRY: 'USD / TL',
+  EUR_TRY: 'EUR / TL',
+  GOLD_GRAM_TRY: 'Gram Altın / TL',
+  SILVER_GRAM_TRY: 'Gümüş / TL',
+  QUARTER_GOLD_TRY: 'Çeyrek Altın / TL',
+  REPUBLIC_GOLD_TRY: 'Cumhuriyet Altını / TL',
+  GOLD_22K_GRAM_TRY: '22 Ayar Gram / TL',
+};
+
+export interface MarketRates {
+  id: string;
+  USD_TRY?: number;
+  EUR_TRY?: number;
+  GOLD_GRAM_TRY?: number;
+  SILVER_GRAM_TRY?: number;
+  QUARTER_GOLD_TRY?: number;
+  REPUBLIC_GOLD_TRY?: number;
+  GOLD_22K_GRAM_TRY?: number;
+  updatedAt: number;
+  createdAt: number;
+  userId: string;
+}
+
+export type PriceSource = 'manual' | 'rate';

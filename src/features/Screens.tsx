@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { coachProvider } from '../domain/coachEngine';
 import { calculateMonthSummary, calculateInvestmentRatio, calculateExpenseRatio, formatCurrency, formatPercentage, formatRatio, getAssetProgress, getInvestmentProgress, getInvestmentRemaining, isInvestmentCompleted, getMonthKey, getTotalAssets, getTotalAssetTargets, parseLocaleNumber, sanitizeNumericInput } from '../domain/financeEngine';
 import { formatMonthKey, getMonthCalculationDate, shiftMonthKey } from '../domain/month';
-import type { Asset, AssetGroup, AssetUnit, Income, FixedExpense, CategoryBudget, Investment, InvestmentGroup } from '../domain/types';
-import { ASSET_GROUPS, ASSET_GROUP_LABELS, ASSET_UNITS, ASSET_UNIT_LABELS, INVESTMENT_GROUPS, INVESTMENT_GROUP_LABELS } from '../domain/types';
+import type { Asset, AssetGroup, AssetUnit, Income, FixedExpense, CategoryBudget, Investment, InvestmentGroup, MarketRateKey, MarketRates } from '../domain/types';
+import { ASSET_GROUPS, ASSET_GROUP_LABELS, ASSET_UNITS, ASSET_UNIT_LABELS, INVESTMENT_GROUPS, INVESTMENT_GROUP_LABELS, MARKET_RATE_KEYS, MARKET_RATE_LABELS } from '../domain/types';
 import { useAkceStore } from '../store/AkceStore';
 import { useAuth } from '../auth/AuthProvider';
 import { getIsDeviceTrusted, setIsDeviceTrusted } from '../store/devicePreference';
@@ -463,6 +463,8 @@ export function AssetsScreen({ openFormSignal, onFormSignalConsumed }: { openFor
   const [unit, setUnit] = useState<AssetUnit>('Adet');
   const [unitPrice, setUnitPrice] = useState('');
   const [targetAmount, setTargetAmount] = useState('');
+  const [priceSource, setPriceSource] = useState<'manual' | 'rate'>('manual');
+  const [rateKey, setRateKey] = useState<MarketRateKey | ''>('');
   const [formError, setFormError] = useState('');
 
   const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; asset?: Asset }>({ isOpen: false });
@@ -478,11 +480,13 @@ export function AssetsScreen({ openFormSignal, onFormSignalConsumed }: { openFor
   const viewportHeight = useVisualViewportHeight();
   const sheetMaxHeight = viewportHeight > 0 ? `${Math.floor(viewportHeight * 0.94)}px` : '94vh';
 
-  const derivedCurrentAmount = (parseLocaleNumber(quantity) ?? 0) * (parseLocaleNumber(unitPrice) ?? 0);
+  const derivedCurrentAmount = priceSource === 'rate' && rateKey && (state.marketRates ?? {})[rateKey] !== undefined
+    ? (parseLocaleNumber(quantity) ?? 0) * (state.marketRates ?? {})[rateKey]
+    : (parseLocaleNumber(quantity) ?? 0) * (parseLocaleNumber(unitPrice) ?? 0);
 
   const openAddAsset = () => {
     setAssetGroup('Altın'); setAssetName(''); setQuantity('1');
-    setUnit('Adet'); setUnitPrice(''); setTargetAmount(''); setFormError('');
+    setUnit('Adet'); setUnitPrice(''); setTargetAmount(''); setPriceSource('manual'); setRateKey(''); setFormError('');
     setAssetForm({ isOpen: true, mode: 'add' });
   };
 
@@ -500,24 +504,38 @@ export function AssetsScreen({ openFormSignal, onFormSignalConsumed }: { openFor
     setUnit(asset.unit ?? 'Adet');
     setUnitPrice(asset.unitPrice !== undefined ? String(asset.unitPrice) : '');
     setTargetAmount(String(asset.targetAmount));
+    setPriceSource(asset.priceSource ?? 'manual');
+    setRateKey(asset.rateKey ?? '');
     setFormError('');
     setAssetForm({ isOpen: true, mode: 'edit', currentAsset: asset });
   };
 
   const saveAsset = () => {
     const qty = parseLocaleNumber(quantity);
-    const price = parseLocaleNumber(unitPrice);
     const tgt = parseLocaleNumber(targetAmount);
     if (!assetName.trim()) { setFormError('Ad boş olamaz.'); return; }
     if (qty === undefined || qty <= 0) { setFormError('Miktar 0\'dan büyük olmalı.'); return; }
-    if (price === undefined || price < 0) { setFormError('Birim fiyat 0 veya daha büyük olmalı.'); return; }
     if (tgt === undefined || tgt < 0) { setFormError('Hedef tutar 0 veya daha büyük olmalı.'); return; }
-    const cur = qty * price;
+    let price: number;
+    let cur: number;
+    if (priceSource === 'rate') {
+      if (!rateKey) { setFormError('Kur seçimi zorunlu.'); return; }
+      const rateVal = (state.marketRates ?? {})[rateKey];
+      if (rateVal === undefined || rateVal === null || !Number.isFinite(rateVal) || rateVal < 0) {
+        setFormError('Seçili kur için değer girilmemiş. Kur Bilgileri ekranından güncelleyin.'); return;
+      }
+      price = rateVal;
+      cur = qty * price;
+    } else {
+      price = parseLocaleNumber(unitPrice) ?? 0;
+      if (price < 0) { setFormError('Birim fiyat 0 veya daha büyük olmalı.'); return; }
+      cur = qty * price;
+    }
     const now = Date.now();
     if (assetForm.mode === 'edit' && assetForm.currentAsset) {
-      dispatch({ type: 'UPDATE_ASSET', id: assetForm.currentAsset.id, amount: cur, targetAmount: tgt, name: assetName.trim(), group: assetGroup, valuationMode: 'quantity', quantity: qty, unit, unitPrice: price });
+      dispatch({ type: 'UPDATE_ASSET', id: assetForm.currentAsset.id, amount: cur, targetAmount: tgt, name: assetName.trim(), group: assetGroup, valuationMode: 'quantity', quantity: qty, unit, unitPrice: price, priceSource, rateKey: rateKey || undefined });
     } else {
-      dispatch({ type: 'ADD_ASSET', payload: { id: crypto.randomUUID(), group: assetGroup, name: assetName.trim(), valuationMode: 'quantity', quantity: qty, unit, unitPrice: price, currentAmount: cur, targetAmount: tgt, createdAt: now, updatedAt: now, userId: 'local-user' } });
+      dispatch({ type: 'ADD_ASSET', payload: { id: crypto.randomUUID(), group: assetGroup, name: assetName.trim(), valuationMode: 'quantity', priceSource, rateKey: rateKey || undefined, quantity: qty, unit, unitPrice: price, currentAmount: cur, targetAmount: tgt, createdAt: now, updatedAt: now, userId: 'local-user' } });
     }
     closeAssetForm();
   };
@@ -572,7 +590,9 @@ export function AssetsScreen({ openFormSignal, onFormSignalConsumed }: { openFor
           <label className="field">Miktar<input inputMode="decimal" value={quantity} onChange={e => { setQuantity(sanitizeNumericInput(e.target.value)); setFormError(''); }} placeholder="1" /></label>
           <label className="field">Birim<select value={unit} onChange={e => setUnit(e.target.value as AssetUnit)}>{ASSET_UNITS.map(u => <option key={u} value={u}>{ASSET_UNIT_LABELS[u]}</option>)}</select></label>
         </div>
-        <label className="amount-input"><span>Birim fiyat</span><div><input inputMode="decimal" value={unitPrice} onChange={e => { setUnitPrice(sanitizeNumericInput(e.target.value)); setFormError(''); }} placeholder="0" aria-label="Birim fiyat" /><b>TL</b></div></label>
+        <label className="field">Fiyat Kaynağı<select value={priceSource} onChange={e => { setPriceSource(e.target.value as 'manual' | 'rate'); setFormError(''); }}><option value="manual">Manuel</option><option value="rate">Kur Bilgilerinden</option></select></label>
+        {priceSource === 'rate' && <label className="field">Kur Seçimi<select value={rateKey} onChange={e => { setRateKey(e.target.value as MarketRateKey); setFormError(''); }}><option value="">Seçin</option>{MARKET_RATE_KEYS.map(k => <option key={k} value={k}>{MARKET_RATE_LABELS[k]}</option>)}</select></label>}
+        {priceSource === 'manual' ? <label className="amount-input"><span>Birim fiyat</span><div><input inputMode="decimal" value={unitPrice} onChange={e => { setUnitPrice(sanitizeNumericInput(e.target.value)); setFormError(''); }} placeholder="0" aria-label="Birim fiyat" /><b>TL</b></div></label> : <label className="amount-input"><span>Birim fiyat (kurdan)</span><div><input value={rateKey && (state.marketRates ?? {})[rateKey] !== undefined ? formatCurrency((state.marketRates ?? {})[rateKey]) : '—'} readOnly aria-label="Birim fiyat" /><b>TL</b></div></label>}
         <label className="amount-input"><span>Güncel değer</span><div><input value={formatCurrency(derivedCurrentAmount)} readOnly aria-label="Güncel değer" /><b>TL</b></div></label>
         <label className="amount-input"><span>Hedef değer (isteğe bağlı)</span><div><input inputMode="decimal" value={targetAmount} onChange={e => { setTargetAmount(sanitizeNumericInput(e.target.value)); setFormError(''); }} placeholder="0" aria-label="Hedef değer" /><b>TL</b></div></label>
         {formError && <p className="form-error">{formError}</p>}
@@ -586,6 +606,8 @@ export function AssetsScreen({ openFormSignal, onFormSignalConsumed }: { openFor
         <header className="sheet__header"><div><span className="eyebrow">VARLIK DETAYI</span><h2 id="asset-detail-title">{detailAsset.name || ASSET_GROUP_LABELS[detailAsset.group]}</h2></div><button className="icon-button" onClick={closeDetail} aria-label="Kapat"><Icon name="close" /></button></header>
         <div className="detail-grid">
           <div className="detail-row"><span>Tür</span><b>{ASSET_GROUP_LABELS[detailAsset.group]}</b></div>
+          <div className="detail-row"><span>Fiyat kaynağı</span><b>{detailAsset.priceSource === 'rate' ? 'Kur Bilgilerinden' : 'Manuel'}</b></div>
+          {detailAsset.priceSource === 'rate' && detailAsset.rateKey && <div className="detail-row"><span>Kur</span><b>{MARKET_RATE_LABELS[detailAsset.rateKey]}</b></div>}
           <div className="detail-row"><span>Miktar</span><b>{detailAsset.quantity}</b></div>
           <div className="detail-row"><span>Birim</span><b>{detailAsset.unit ? ASSET_UNIT_LABELS[detailAsset.unit] : '-'}</b></div>
           <div className="detail-row"><span>Birim fiyat</span><b>{formatCurrency(detailAsset.unitPrice ?? 0)}</b></div>
@@ -646,4 +668,65 @@ export function SettingsScreen({ account, mode }: { account?: { label: string; d
   };
 
   return <div className="screen"><PageHeader eyebrow="TERCİHLER" title="Ayarlar" description="Akçe deneyimini kendine göre düzenle." />{account && <section className="settings-card"><div><span>Oturum</span><span className="settings-account"><b>{account.label}</b><small>{account.detail}</small></span></div><div><span>Hesap seçimi</span><button className="secondary-button" onClick={account.onAction}>{account.actionLabel}</button></div></section>}<section className="settings-card"><div><span>Para birimi</span><b>{state.settings.currency}</b></div><div><span>Bütçe başlangıç günü</span><b>Her ayın {state.settings.monthStartDay}. günü</b></div><div><span>Veri saklama</span><b>{mode === 'firebase' ? 'Bulut + cihaz' : 'Bu cihazda'}</b></div><div><span>Cihaz türü</span><button className="secondary-button" onClick={toggleTrusted}>{isTrusted ? 'Kişisel cihaz (Kalıcı önbellek)' : 'Ortak cihaz (Geçici bellek)'}</button></div></section><section className="settings-card"><div><span>Tanıtımı yeniden göster</span><button className="secondary-button" onClick={() => dispatch({ type: 'SET_ONBOARDING', value: true })}>Göster</button></div></section><section className="settings-card settings-card--danger"><div><span>Verileri Sıfırla</span><button className="secondary-button secondary-button--danger" onClick={openResetSheet}>Tüm finansal verileri sil</button></div></section><p className="settings-note">{mode === 'firebase' ? 'Akçe verilerin bulutta ve bu cihazda saklanır.' : 'Akçe V1 verileri yalnızca bu cihazda saklar.'}</p>{resetSheetOpen && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) closeResetSheet(); }}><section className="sheet" role="dialog" aria-modal="true" aria-labelledby="reset-title" ref={resetSheetRef} style={{ maxHeight: sheetMaxHeight }}><div className="sheet__handle" /><header className="sheet__header"><div><span className="eyebrow">VERİ SIFIRLAMA</span><h2 id="reset-title">Finansal verileri sil</h2></div><button className="icon-button" onClick={closeResetSheet} aria-label="Kapat"><Icon name="close" /></button></header>{resetStatus === 'done' ? <div className="reset-done"><Icon name="check" /><p>Veriler başarıyla silindi.</p></div> : <><div className="reset-warning"><p><strong>Bu işlem geri alınamaz.</strong></p><ul><li>Harcamalar, gelirler, sabit giderler, yatırımlar, bütçeler, varlıklar ve hedefler silinecek.</li><li>Google hesabı ve AKÇE hesabı silinmeyecek.</li></ul></div><label className="reset-confirm-label"><span>Silme işlemini onaylamak için <strong>SİL</strong> yazın</span><input autoFocus value={confirmText} onChange={e => setConfirmText(e.target.value)} placeholder="SİL" aria-label="Silme onayı" /></label>{resetStatus === 'error' && <p className="form-error">Silme işlemi başarısız oldu. Lütfen tekrar deneyin.</p>}<button className="primary-button primary-button--danger" disabled={confirmText !== 'SİL' || resetStatus === 'loading'} onClick={handleResetConfirm}>{resetStatus === 'loading' ? 'Siliniyor...' : 'Tüm verileri sil'}</button></>}</section></div>}</div>;
+}
+
+export function KurBilgileriScreen() {
+  const { state, dispatch } = useAkceStore();
+  const currentRates = state.marketRates ?? {};
+  const [form, setForm] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {};
+    for (const key of MARKET_RATE_KEYS) {
+      initial[key] = currentRates[key] !== undefined ? String(currentRates[key]) : '';
+    }
+    return initial;
+  });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const handleRateChange = (key: MarketRateKey, value: string) => {
+    setForm(prev => ({ ...prev, [key]: sanitizeNumericInput(value) }));
+    setSaved(false);
+  };
+
+  const handleSave = () => {
+    setSaving(true);
+    const ratesRecord: Record<string, number> = {};
+    for (const key of MARKET_RATE_KEYS) {
+      const parsed = parseLocaleNumber(form[key]);
+      if (parsed !== undefined && parsed >= 0) {
+        ratesRecord[key] = parsed;
+      }
+    }
+    const now = Date.now();
+    const rates = { id: 'current', updatedAt: now, createdAt: now, userId: 'local-user', ...ratesRecord } as unknown as MarketRates;
+    dispatch({ type: 'UPDATE_MARKET_RATES', payload: rates });
+    dispatch({ type: 'REVALUE_ASSETS' });
+    setSaving(false);
+    setSaved(true);
+  };
+
+  return <div className="screen">
+    <PageHeader eyebrow="KUR BİLGİLERİ" title="Kur Bilgileri" description="Güncel kurları girerek bağlı varlıklarını otomatik olarak yeniden değerle." />
+    <section className="settings-card">
+      {MARKET_RATE_KEYS.map(key => (
+        <div key={key} className="rate-row">
+          <span>{MARKET_RATE_LABELS[key]}</span>
+          <div className="amount-input">
+            <input
+              inputMode="decimal"
+              value={form[key] ?? ''}
+              onChange={e => handleRateChange(key, e.target.value)}
+              placeholder="0"
+              aria-label={MARKET_RATE_LABELS[key]}
+            />
+            <b>TL</b>
+          </div>
+        </div>
+      ))}
+    </section>
+    {saved && <p className="rate-saved">Kurlar kaydedildi ve varlıklar güncellendi.</p>}
+    <button className="primary-button" onClick={handleSave} disabled={saving}>
+      {saving ? 'Kaydediliyor...' : 'Kurları Güncelle'}
+    </button>
+  </div>;
 }

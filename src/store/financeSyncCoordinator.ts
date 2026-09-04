@@ -15,6 +15,7 @@ import type {
   FinanceRepository,
   FinanceSubscriptionUpdate,
   LocalFinanceRepository,
+  MarketRatesData,
   RealtimeFinanceRepository,
 } from './financeRepository';
 import type { AkceData } from './seed';
@@ -23,6 +24,7 @@ import { fromFirestoreDto, toFirestoreDto } from './firestoreFinanceMappers';
 import {
   globalCollectionPath,
   globalDocumentPath,
+  marketRatesPath,
   monthPath,
   monthlyCollectionPath,
   monthlyDocumentPath,
@@ -50,6 +52,7 @@ export interface FinanceSyncCoordinatorOptions {
   onSyncStatusChange?: (status: SyncStatus) => void;
   onHydrateState?: (state: AkceData) => void;
   onSubscriptionUpdate?: (update: FinanceSubscriptionUpdate) => void;
+  onMarketRatesUpdate?: (rates: MarketRatesData) => void;
   onError?: (error: Error) => void;
 }
 
@@ -128,6 +131,7 @@ export class FinanceSyncCoordinator {
   private currentMonthKey: string | null = null;
   private unsubscribeMonth: (() => void) | null = null;
   private unsubscribeGlobals: (() => void) | null = null;
+  private unsubscribeMarketRates: (() => void) | null = null;
   private activeRepository: FinanceRepository;
   private migrationInProgress = false;
   private aborted = false;
@@ -142,6 +146,7 @@ export class FinanceSyncCoordinator {
   private readonly onSyncStatusChange?: (status: SyncStatus) => void;
   private readonly onHydrateState?: (state: AkceData) => void;
   private readonly onSubscriptionUpdate?: (update: FinanceSubscriptionUpdate) => void;
+  private readonly onMarketRatesUpdate?: (rates: MarketRatesData) => void;
   private readonly onErrorCallback?: (error: Error) => void;
 
   constructor(options: FinanceSyncCoordinatorOptions) {
@@ -154,6 +159,7 @@ export class FinanceSyncCoordinator {
     this.onSyncStatusChange = options.onSyncStatusChange;
     this.onHydrateState = options.onHydrateState;
     this.onSubscriptionUpdate = options.onSubscriptionUpdate;
+    this.onMarketRatesUpdate = options.onMarketRatesUpdate;
     this.onErrorCallback = options.onError;
 
     this.activeRepository = this.localRepo;
@@ -492,6 +498,7 @@ export class FinanceSyncCoordinator {
       assets: mergedAssets.merged,
       goals: mergedGoals.merged,
       assetSnapshots: mergedSnapshots.merged,
+      marketRates: localState.marketRates ?? {},
       settings: localState.settings,
     };
 
@@ -567,6 +574,7 @@ export class FinanceSyncCoordinator {
       assets: cloud.assets,
       goals: cloud.goals,
       assetSnapshots: cloud.assetSnapshots,
+      marketRates: {},
       settings,
     };
   }
@@ -657,6 +665,12 @@ export class FinanceSyncCoordinator {
       update => this.onSubscriptionUpdate?.(update),
       error => this.handleRepositoryError(error),
     );
+
+    this.unsubscribeMarketRates = this.firebaseRepo.subscribeMarketRates(
+      uid,
+      rates => this.onMarketRatesUpdate?.(rates),
+      error => this.handleRepositoryError(error),
+    );
   }
 
   switchSelectedMonth(monthKey: string): void {
@@ -721,14 +735,21 @@ export class FinanceSyncCoordinator {
       await this.commitBatchesInChunks(ops);
     }
 
-    // 5. Delete migration marker
+    // 5. Delete market rates
+    try {
+      await this.gateway.deleteDocument(marketRatesPath(uid));
+    } catch {
+      // Market rates may not exist; ignore
+    }
+
+    // 6. Delete migration marker
     try {
       await this.gateway.deleteDocument(`users/${uid}/meta/migration`);
     } catch {
       // Migration marker may not exist; ignore
     }
 
-    // 6. Clear local storage finance data
+    // 7. Clear local storage finance data
     this.storage.removeItem?.('akce-v1-state');
     this.storage.removeItem?.(`akce-v1-backup-${uid}`);
     setEmptyStateMarker(this.storage);
@@ -744,6 +765,8 @@ export class FinanceSyncCoordinator {
     this.unsubscribeMonth = null;
     this.unsubscribeGlobals?.();
     this.unsubscribeGlobals = null;
+    this.unsubscribeMarketRates?.();
+    this.unsubscribeMarketRates = null;
     this.firebaseRepo.dispose();
   }
 

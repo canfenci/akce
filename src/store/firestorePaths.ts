@@ -35,3 +35,7 @@ export function globalDocumentPath(uid: string, collection: 'assets' | 'goals' |
   assertSegment(id, 'belge kimliği');
   return `${globalCollectionPath(uid, collection)}/${id}`;
 }
+
+export function marketRatesPath(uid: string) {
+  return `${userPath(uid)}/marketRates/current`;
+}

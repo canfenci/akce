@@ -18,6 +18,7 @@ class FakeGateway implements FirestoreGateway {
     this.subscriptions.push({ path, onDocuments, unsubscribe });
     return unsubscribe;
   }
+  subscribeDocument(_path: string, _onDocument: (doc: { id: string; data: Record<string, unknown> } | null) => void, _onError: (error: unknown) => void) { return () => {}; }
   async setDocument(path: string, data: Record<string, unknown>, merge?: boolean) { this.sets.push({ path, data, merge }); }
   async updateDocument(path: string, data: Record<string, unknown>) { this.updates.push({ path, data }); }
   async deleteDocument(path: string) { this.deletes.push(path); }

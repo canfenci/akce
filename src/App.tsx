@@ -2,17 +2,18 @@ import { useEffect, useRef, useState } from 'react';
 import { Icon, type IconName } from './components/Icon';
 import { QuickExpenseSheet } from './components/QuickExpenseSheet';
 import { QuickAddSheet, type QuickAddAction } from './components/QuickAddSheet';
-import { AssetsScreen, BudgetScreen, CoachScreen, ExpensesScreen, HomeScreen, InvestmentsScreen, SettingsScreen } from './features/Screens';
+import { AssetsScreen, BudgetScreen, CoachScreen, ExpensesScreen, HomeScreen, InvestmentsScreen, KurBilgileriScreen, SettingsScreen } from './features/Screens';
 import { AkceStoreProvider, useAkceStore } from './store/AkceStore';
 import { useAuth } from './auth/AuthProvider';
 import { AuthLoadingScreen, SignedOutScreen } from './auth/AuthScreens';
 import type { Expense } from './domain/types';
 
-type Page = 'home' | 'expenses' | 'budget' | 'investments' | 'assets' | 'coach' | 'settings';
+type Page = 'home' | 'expenses' | 'budget' | 'investments' | 'assets' | 'coach' | 'settings' | 'kurBilgileri';
 const navItems: { id: Page; label: string; icon: IconName }[] = [
   { id: 'home', label: 'Ana Sayfa', icon: 'home' }, { id: 'expenses', label: 'Harcamalar', icon: 'receipt' },
   { id: 'budget', label: 'Bütçe', icon: 'wallet' }, { id: 'investments', label: 'Yatırımlar', icon: 'chart' },
   { id: 'assets', label: 'Varlıklar & Hedefler', icon: 'target' }, { id: 'coach', label: 'Finans Koçu', icon: 'spark' },
+  { id: 'kurBilgileri', label: 'Kur Bilgileri', icon: 'chart' },
   { id: 'settings', label: 'Ayarlar', icon: 'settings' },
 ];
 
@@ -39,7 +40,7 @@ function FinanceApp() {
   const account = mode === 'local'
     ? { label: 'Yerel kullanım', detail: 'Veriler yalnızca bu cihazda', actionLabel: 'Giriş ekranına dön', onAction: leaveLocalMode }
     : { label: user?.displayName || 'Google hesabı', detail: user?.email || '', actionLabel: 'Çıkış yap', onAction: () => void signOut() };
-  const screen = page === 'home' ? <HomeScreen goTo={navigate} /> : page === 'expenses' ? <ExpensesScreen openQuick={() => setQuickOpen(true)} openFormSignal={openFormSignal} onFormSignalConsumed={() => setOpenFormSignal(null)} /> : page === 'budget' ? <BudgetScreen openFormSignal={openFormSignal} onFormSignalConsumed={() => setOpenFormSignal(null)} /> : page === 'investments' ? <InvestmentsScreen openFormSignal={openFormSignal} onFormSignalConsumed={() => setOpenFormSignal(null)} /> : page === 'assets' ? <AssetsScreen openFormSignal={openFormSignal} onFormSignalConsumed={() => setOpenFormSignal(null)} /> : page === 'coach' ? <CoachScreen /> : <SettingsScreen account={account} mode={mode} />;
+  const screen = page === 'home' ? <HomeScreen goTo={navigate} /> : page === 'expenses' ? <ExpensesScreen openQuick={() => setQuickOpen(true)} openFormSignal={openFormSignal} onFormSignalConsumed={() => setOpenFormSignal(null)} /> : page === 'budget' ? <BudgetScreen openFormSignal={openFormSignal} onFormSignalConsumed={() => setOpenFormSignal(null)} /> : page === 'investments' ? <InvestmentsScreen openFormSignal={openFormSignal} onFormSignalConsumed={() => setOpenFormSignal(null)} /> : page === 'assets' ? <AssetsScreen openFormSignal={openFormSignal} onFormSignalConsumed={() => setOpenFormSignal(null)} /> : page === 'coach' ? <CoachScreen /> : page === 'kurBilgileri' ? <KurBilgileriScreen /> : <SettingsScreen account={account} mode={mode} />;
 
   const syncFooter = mode === 'local'
     ? { title: 'Veriler cihazında', subtitle: 'Akçe V1 · Çevrimdışı hazır' }
