@@ -150,17 +150,11 @@ export class FirebaseFinanceRepository implements RealtimeFinanceRepository {
           for (const [key, value] of Object.entries(mutation.rates)) {
             ratesData[key] = value;
           }
-          await this.gateway.setDocument(marketRatesPath(uid), {
-            ...ratesData,
-            schemaVersion: 2,
-            deviceId: this.deviceId,
-            updatedAt: now,
-            createdAt: now,
-            serverUpdatedAt: this.gateway.serverTimestamp(),
-          }, true);
-          for (const asset of mutation.assets) {
-            await this.gateway.updateDocument(globalDocumentPath(uid, 'assets', asset.id), this.updateDto(asset));
-          }
+          const operations: GatewayBatchOperation[] = [
+            { type: 'set', path: marketRatesPath(uid), data: { ...ratesData, schemaVersion: 2, deviceId: this.deviceId, updatedAt: now, createdAt: now, serverUpdatedAt: this.gateway.serverTimestamp() }, merge: true },
+            ...mutation.assets.map(asset => ({ type: 'update' as const, path: globalDocumentPath(uid, 'assets', asset.id), data: this.updateDto(asset) })),
+          ];
+          await this.gateway.commitBatch(operations);
           break;
         }
         case 'month.initialize': {

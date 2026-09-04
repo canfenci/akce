@@ -96,7 +96,7 @@ function evaluateRules(context: EvaluationContext): { allowed: boolean; reason?:
     for (const key of Object.keys(data)) {
       if (key === 'schemaVersion' || key === 'deviceId' || key === 'updatedAt' || key === 'createdAt' || key === 'serverUpdatedAt') continue;
       if (!validRateKeys.includes(key)) return { allowed: false, reason: 'invalid-rate-key' };
-      if (typeof data[key] !== 'number' || data[key] < 0) return { allowed: false, reason: 'negative-amount' };
+      if (typeof data[key] !== 'number' || data[key] <= 0) return { allowed: false, reason: 'non-positive-amount' };
     }
     return { allowed: true };
   }
@@ -627,6 +627,34 @@ describe('Firestore Security Rules verification', () => {
           auth: { uid: 'user-1' },
           resource: {
             data: { schemaVersion: 2 },
+          },
+        },
+        path: 'users/user-1/marketRates/current',
+        operation: 'create',
+      });
+      expect(res.allowed).toBe(true);
+    });
+
+    it('denies market rates with zero values', () => {
+      const res = evaluateRules({
+        request: {
+          auth: { uid: 'user-1' },
+          resource: {
+            data: { schemaVersion: 2, USD_TRY: 0 },
+          },
+        },
+        path: 'users/user-1/marketRates/current',
+        operation: 'create',
+      });
+      expect(res.allowed).toBe(false);
+    });
+
+    it('allows market rates with positive decimal values', () => {
+      const res = evaluateRules({
+        request: {
+          auth: { uid: 'user-1' },
+          resource: {
+            data: { schemaVersion: 2, USD_TRY: 38.5, GOLD_GRAM_TRY: 3200.75 },
           },
         },
         path: 'users/user-1/marketRates/current',

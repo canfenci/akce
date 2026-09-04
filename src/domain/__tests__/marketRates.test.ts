@@ -106,8 +106,8 @@ describe('AKÇE-038: market rates & asset revaluation', () => {
 
     it('preserves asset when rate is zero', () => {
       const result = revalueAsset(rateAsset, { GOLD_GRAM_TRY: 0 });
-      expect(result.unitPrice).toBe(0);
-      expect(result.currentAmount).toBe(0);
+      expect(result.unitPrice).toBe(3083);
+      expect(result.currentAmount).toBe(73992);
     });
 
     it('preserves asset when rate is negative', () => {
@@ -178,6 +178,46 @@ describe('AKÇE-038: market rates & asset revaluation', () => {
       const revalued = revalueAsset(asset, { GOLD_GRAM_TRY: 6250 });
       const after = getAssetProgress(revalued);
       expect(after).toBeGreaterThan(before);
+    });
+  });
+
+  describe('zero rate rejected (strictly > 0 policy)', () => {
+    const rateAsset: Asset = {
+      id: 'a1', group: 'Altın', name: 'Gram Altın', valuationMode: 'quantity',
+      priceSource: 'rate', rateKey: 'GOLD_GRAM_TRY',
+      quantity: 24, unit: 'Gram', unitPrice: 3083, currentAmount: 73992, targetAmount: 150000,
+      ...common,
+    };
+
+    it('undefined rate leaves asset unchanged', () => {
+      const result = revalueAsset(rateAsset, {});
+      expect(result.unitPrice).toBe(3083);
+      expect(result.currentAmount).toBe(73992);
+      expect(result.updatedAt).toBe(rateAsset.updatedAt);
+    });
+
+    it('zero rate leaves asset unchanged', () => {
+      const result = revalueAsset(rateAsset, { GOLD_GRAM_TRY: 0 });
+      expect(result.unitPrice).toBe(3083);
+      expect(result.currentAmount).toBe(73992);
+    });
+
+    it('negative rate leaves asset unchanged', () => {
+      const result = revalueAsset(rateAsset, { GOLD_GRAM_TRY: -100 });
+      expect(result.unitPrice).toBe(3083);
+      expect(result.currentAmount).toBe(73992);
+    });
+
+    it('NaN rate leaves asset unchanged', () => {
+      const result = revalueAsset(rateAsset, { GOLD_GRAM_TRY: NaN });
+      expect(result.unitPrice).toBe(3083);
+      expect(result.currentAmount).toBe(73992);
+    });
+
+    it('positive decimal rate revalues correctly', () => {
+      const result = revalueAsset(rateAsset, { GOLD_GRAM_TRY: 3456.78 });
+      expect(result.unitPrice).toBe(3456.78);
+      expect(result.currentAmount).toBeCloseTo(24 * 3456.78);
     });
   });
 });

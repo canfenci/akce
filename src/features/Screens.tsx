@@ -693,14 +693,13 @@ export function KurBilgileriScreen() {
     const ratesRecord: Record<string, number> = {};
     for (const key of MARKET_RATE_KEYS) {
       const parsed = parseLocaleNumber(form[key]);
-      if (parsed !== undefined && parsed >= 0) {
+      if (parsed !== undefined && parsed > 0) {
         ratesRecord[key] = parsed;
       }
     }
     const now = Date.now();
     const rates = { id: 'current', updatedAt: now, createdAt: now, userId: 'local-user', ...ratesRecord } as unknown as MarketRates;
     dispatch({ type: 'UPDATE_MARKET_RATES', payload: rates });
-    dispatch({ type: 'REVALUE_ASSETS' });
     setSaving(false);
     setSaved(true);
   };

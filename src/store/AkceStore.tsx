@@ -110,11 +110,12 @@ export function reducer(state: AkceData, action: Action): AkceData {
     case 'UPDATE_MARKET_RATES': {
       const ratesRecord: Record<string, number> = {};
       for (const [key, value] of Object.entries(action.payload)) {
-        if (typeof value === 'number' && Number.isFinite(value)) {
+        if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
           ratesRecord[key] = value;
         }
       }
-      return { ...state, marketRates: ratesRecord };
+      const revalued = state.assets.map(a => revalueAsset(a, ratesRecord));
+      return { ...state, marketRates: ratesRecord, assets: revalued };
     }
     case 'SYNC_MARKET_RATES_UPDATE': return { ...state, marketRates: action.rates };
     case 'REVALUE_ASSETS': {
@@ -221,7 +222,7 @@ export function mapActionToMutation(action: Action, currentState: AkceData): Fin
     case 'UPDATE_MARKET_RATES': {
       const ratesRecord: Record<string, number> = {};
       for (const [key, value] of Object.entries(action.payload)) {
-        if (typeof value === 'number' && Number.isFinite(value)) {
+        if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
           ratesRecord[key] = value;
         }
       }

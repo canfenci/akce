@@ -27,18 +27,22 @@ service cloud.firestore {
       return val is number && val >= minVal;
     }
 
+    function validPositiveNumber(val) {
+      return val is number && val > 0;
+    }
+
     function validString(val, minLen, maxLen) {
       return val is string && val.size() >= minLen && val.size() <= maxLen;
     }
 
     function validMarketRateValues(data) {
-      return data.USD_TRY == null || validNumber(data.USD_TRY, 0)
-        && data.EUR_TRY == null || validNumber(data.EUR_TRY, 0)
-        && data.GOLD_GRAM_TRY == null || validNumber(data.GOLD_GRAM_TRY, 0)
-        && data.SILVER_GRAM_TRY == null || validNumber(data.SILVER_GRAM_TRY, 0)
-        && data.QUARTER_GOLD_TRY == null || validNumber(data.QUARTER_GOLD_TRY, 0)
-        && data.REPUBLIC_GOLD_TRY == null || validNumber(data.REPUBLIC_GOLD_TRY, 0)
-        && data.GOLD_22K_GRAM_TRY == null || validNumber(data.GOLD_22K_GRAM_TRY, 0);
+      return (data.USD_TRY == null || validPositiveNumber(data.USD_TRY))
+        && (data.EUR_TRY == null || validPositiveNumber(data.EUR_TRY))
+        && (data.GOLD_GRAM_TRY == null || validPositiveNumber(data.GOLD_GRAM_TRY))
+        && (data.SILVER_GRAM_TRY == null || validPositiveNumber(data.SILVER_GRAM_TRY))
+        && (data.QUARTER_GOLD_TRY == null || validPositiveNumber(data.QUARTER_GOLD_TRY))
+        && (data.REPUBLIC_GOLD_TRY == null || validPositiveNumber(data.REPUBLIC_GOLD_TRY))
+        && (data.GOLD_22K_GRAM_TRY == null || validPositiveNumber(data.GOLD_22K_GRAM_TRY));
     }
 
     // User document tree
