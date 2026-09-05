@@ -1,4 +1,4 @@
-import { Expense, Income, FixedExpense, Investment, Asset, MonthSummary } from '../domain/types';
+import { Expense, Income, FixedExpense, Investment, Asset, AssetList, MonthSummary } from '../domain/types';
 
 export function getMonthKey(date: Date = new Date()): string {
   const year = date.getFullYear();
@@ -39,7 +39,12 @@ export function calculateMonthSummary(
     .filter(i => i.active && i.monthKey === monthKey)
     .reduce((sum, i) => sum + i.amount, 0);
   
-  // Toplam sabit yatırım (planlanan)
+  // AKÇE-047: Extra income from Ek Ders + Özel Ders
+  const extraIncome = getExtraIncome(incomes, monthKey);
+  const flexAmount = getFlexAmount(extraIncome);
+  const netInvestment = getNetInvestment(extraIncome);
+  
+  // Toplam sabit yatırım (planlanan) - kept for backward compatibility
   const totalFixedInvestment = investments
     .filter(inv => inv.monthKey === monthKey)
     .reduce((sum, inv) => sum + inv.plannedAmount, 0);
@@ -54,8 +59,8 @@ export function calculateMonthSummary(
     .filter(e => e.monthKey === monthKey)
     .reduce((sum, e) => sum + e.amount, 0);
   
-  // Kalan serbest bütçe
-  const remainingBudget = totalIncome - totalFixedInvestment - totalAutomaticExpenses - totalVariableExpenses;
+  // Kalan serbest bütçe - now uses netInvestment instead of totalFixedInvestment
+  const remainingBudget = totalIncome - netInvestment - totalAutomaticExpenses - totalVariableExpenses;
   
   // Kalan gün sayısı
   const daysLeft = getDaysLeftInMonth(currentDate);
@@ -129,7 +134,10 @@ export function calculateMonthSummary(
     sevenDayAverage,
     unplannedRatio,
     monthEndEstimate,
-    investmentPlanRealizationRate
+    investmentPlanRealizationRate,
+    extraIncome,
+    flexAmount,
+    netInvestment,
   };
 }
 
@@ -246,4 +254,72 @@ export function getFilteredAssets(assets: Asset[], filter: AssetFilter): Asset[]
 
 export function getListlessAssets(assets: Asset[]): Asset[] {
   return assets.filter(a => !a.assetListId);
+}
+
+// AKÇE-047: Income-Derived Savings & Investment Allocation
+
+export function getExtraIncome(incomes: Income[], monthKey: string): number {
+  return incomes
+    .filter(i => i.active && i.monthKey === monthKey && (i.name === 'Ek Ders' || i.name === 'Özel Ders'))
+    .reduce((sum, i) => sum + i.amount, 0);
+}
+
+export function getFlexAmount(extraIncome: number): number {
+  return Math.min(10000, extraIncome);
+}
+
+export function getNetInvestment(extraIncome: number): number {
+  return Math.max(0, extraIncome - getFlexAmount(extraIncome));
+}
+
+export function getEmergencyFundValue(assets: Asset[], assetLists: AssetList[]): number {
+  const acilFonList = assetLists.find(l => l.name === 'Acil Fon');
+  if (!acilFonList) return 0;
+  return assets
+    .filter(a => a.assetListId === acilFonList.id)
+    .reduce((sum, a) => sum + (a.currentAmount || 0), 0);
+}
+
+export type EmergencyFundTier = {
+  min: number;
+  max: number | null;
+  tp2: number;
+  hisse: number;
+  altinGumus: number;
+  nasdaq: number;
+};
+
+export const EMERGENCY_FUND_TIERS: EmergencyFundTier[] = [
+  { min: 0, max: 50000, tp2: 30, hisse: 40, altinGumus: 20, nasdaq: 10 },
+  { min: 50000, max: 100000, tp2: 25, hisse: 40, altinGumus: 22.5, nasdaq: 12.5 },
+  { min: 100000, max: 200000, tp2: 20, hisse: 40, altinGumus: 25, nasdaq: 15 },
+  { min: 200000, max: null, tp2: 10, hisse: 40, altinGumus: 30, nasdaq: 20 },
+];
+
+export function getEmergencyFundAllocationTier(emergencyFundValue: number): EmergencyFundTier {
+  for (const tier of EMERGENCY_FUND_TIERS) {
+    if (emergencyFundValue >= tier.min && (tier.max === null || emergencyFundValue < tier.max)) {
+      return tier;
+    }
+  }
+  return EMERGENCY_FUND_TIERS[EMERGENCY_FUND_TIERS.length - 1];
+}
+
+export type InvestmentAllocation = {
+  tp2: number;
+  hisse: number;
+  altinGumus: number;
+  nasdaq: number;
+};
+
+export function getInvestmentAllocation(netInvestment: number, emergencyFundValue: number): InvestmentAllocation {
+  if (netInvestment <= 0) {
+    return { tp2: 0, hisse: 0, altinGumus: 0, nasdaq: 0 };
+  }
+  const tier = getEmergencyFundAllocationTier(emergencyFundValue);
+  const tp2 = Math.round(netInvestment * tier.tp2 / 100);
+  const hisse = Math.round(netInvestment * tier.hisse / 100);
+  const altinGumus = Math.round(netInvestment * tier.altinGumus / 100);
+  const nasdaq = netInvestment - tp2 - hisse - altinGumus;
+  return { tp2, hisse, altinGumus, nasdaq };
 }

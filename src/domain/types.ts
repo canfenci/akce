@@ -178,6 +178,9 @@ export interface MonthSummary {
   unplannedRatio: number;
   monthEndEstimate: number;
   investmentPlanRealizationRate: number;
+  extraIncome: number;
+  flexAmount: number;
+  netInvestment: number;
 }
 
 export interface UserProfile {

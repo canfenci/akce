@@ -76,16 +76,18 @@ describe('Finance Engine', () => {
       
       const summary = calculateMonthSummary(incomes, fixedExpenses, investments, expenses, assets, currentDate);
       
+      // AKÇE-047: remainingBudget now uses netInvestment (from Ek Ders + Özel Ders)
+      // Since there are no Ek Ders or Özel Ders entries, netInvestment = 0
       // Gelir: 50000
-      // Yatırım: 5000
+      // Yatırım: 0 (netInvestment)
       // Otomatik gider: 10000
       // Değişken gider: 2000
-      // Kalan: 50000 - 5000 - 10000 - 2000 = 33000
+      // Kalan: 50000 - 0 - 10000 - 2000 = 38000
       // Kalan gün: 16
-      // Günlük limit: 33000 / 16 = 2062.5
-      expect(summary.remainingBudget).toBe(33000);
+      // Günlük limit: 38000 / 16 = 2375
+      expect(summary.remainingBudget).toBe(38000);
       expect(summary.daysLeft).toBe(16);
-      expect(summary.dailySafeLimit).toBeCloseTo(2062.5, 1);
+      expect(summary.dailySafeLimit).toBeCloseTo(2375, 1);
     });
 
     it('should exclude investment from spendable budget', () => {
@@ -105,8 +107,10 @@ describe('Finance Engine', () => {
       
       const summary = calculateMonthSummary(incomes, fixedExpenses, investments, expenses, assets, currentDate);
       
-      // Yatırım parası bütçeden düşülmeli
-      expect(summary.remainingBudget).toBe(20000); // 30000 - 10000
+      // AKÇE-047: remainingBudget now uses netInvestment (from Ek Ders + Özel Ders)
+      // Since there are no Ek Ders or Özel Ders entries, netInvestment = 0
+      // remainingBudget = 30000 - 0 = 30000
+      expect(summary.remainingBudget).toBe(30000);
     });
 
     it('should calculate unplanned expense ratio', () => {
@@ -407,7 +411,8 @@ expect(summary.sevenDayAverage).toBe(1500);
 
   describe('dailySafeLimit edge cases', () => {
     const incomes: Income[] = [
-      { id: '1', name: 'Maaş', amount: 100000, date: '2024-09-01', recurring: true, active: true, monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' }
+      { id: '1', name: 'Maaş', amount: 70000, date: '2024-09-01', recurring: true, active: true, monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' },
+      { id: '2', name: 'Ek Ders', amount: 30000, date: '2024-09-01', recurring: true, active: true, monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' },
     ];
     const fixedExpenses: FixedExpense[] = [
       { id: '1', name: 'Kira', amount: 26000, dueDay: 1, category: 'Konut', frequency: 'monthly', active: true, monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' }
@@ -420,30 +425,33 @@ expect(summary.sevenDayAverage).toBe(1500);
       const expenses: Expense[] = [
         { id: '1', amount: 10000, category: 'Market', type: 'zorunlu', paymentMethod: 'kart', date: '2024-09-10', monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' }
       ];
-      // remainingBudget = 100000 - 30000 - 26000 - 10000 = 34000
+      // extraIncome = 30000, flexAmount = 10000, netInvestment = 20000
+      // remainingBudget = 100000 - 20000 - 26000 - 10000 = 44000
       // daysLeft on Sep 10 = 20
       const summary = calculateMonthSummary(incomes, fixedExpenses, investments, expenses, [], new Date('2024-09-10'));
-      expect(summary.remainingBudget).toBe(34000);
+      expect(summary.remainingBudget).toBe(44000);
       expect(summary.daysLeft).toBe(20);
-      expect(summary.dailySafeLimit).toBe(1700);
+      expect(summary.dailySafeLimit).toBe(2200);
     });
 
     it('final day / positive remaining: shows full remaining budget', () => {
       const expenses: Expense[] = [
         { id: '1', amount: 6000, category: 'Market', type: 'zorunlu', paymentMethod: 'kart', date: '2024-09-30', monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' }
       ];
-      // remainingBudget = 100000 - 30000 - 26000 - 6000 = 38000
+      // extraIncome = 30000, flexAmount = 10000, netInvestment = 20000
+      // remainingBudget = 100000 - 20000 - 26000 - 6000 = 48000
       const summary = calculateMonthSummary(incomes, fixedExpenses, investments, expenses, [], new Date('2024-09-30'));
-      expect(summary.remainingBudget).toBe(38000);
+      expect(summary.remainingBudget).toBe(48000);
       expect(summary.daysLeft).toBe(0);
-      expect(summary.dailySafeLimit).toBe(38000);
+      expect(summary.dailySafeLimit).toBe(48000);
     });
 
     it('final day / zero remaining: shows 0', () => {
+      // extraIncome = 30000, flexAmount = 10000, netInvestment = 20000
+      // remainingBudget = 100000 - 20000 - 26000 - X = 0 => X = 54000
       const expenses: Expense[] = [
-        { id: '1', amount: 44000, category: 'Market', type: 'zorunlu', paymentMethod: 'kart', date: '2024-09-30', monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' }
+        { id: '1', amount: 54000, category: 'Market', type: 'zorunlu', paymentMethod: 'kart', date: '2024-09-30', monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' }
       ];
-      // remainingBudget = 100000 - 30000 - 26000 - 44000 = 0
       const summary = calculateMonthSummary(incomes, fixedExpenses, investments, expenses, [], new Date('2024-09-30'));
       expect(summary.remainingBudget).toBe(0);
       expect(summary.daysLeft).toBe(0);
@@ -452,9 +460,10 @@ expect(summary.sevenDayAverage).toBe(1500);
 
     it('final day / negative remaining: shows 0 (over-budget state)', () => {
       const expenses: Expense[] = [
-        { id: '1', amount: 50000, category: 'Market', type: 'zorunlu', paymentMethod: 'kart', date: '2024-09-30', monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' }
+        { id: '1', amount: 60000, category: 'Market', type: 'zorunlu', paymentMethod: 'kart', date: '2024-09-30', monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' }
       ];
-      // remainingBudget = 100000 - 30000 - 26000 - 50000 = -6000
+      // extraIncome = 30000, flexAmount = 10000, netInvestment = 20000
+      // remainingBudget = 100000 - 20000 - 26000 - 60000 = -6000
       const summary = calculateMonthSummary(incomes, fixedExpenses, investments, expenses, [], new Date('2024-09-30'));
       expect(summary.remainingBudget).toBe(-6000);
       expect(summary.daysLeft).toBe(0);
@@ -493,9 +502,10 @@ expect(summary.sevenDayAverage).toBe(1500);
       const expenses: Expense[] = [
         { id: '1', amount: 90000, category: 'Market', type: 'zorunlu', paymentMethod: 'kart', date: '2024-09-15', monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' }
       ];
-      // remainingBudget = 100000 - 30000 - 26000 - 90000 = -46000
+      // extraIncome = 30000, flexAmount = 10000, netInvestment = 20000
+      // remainingBudget = 100000 - 20000 - 26000 - 90000 = -36000
       const summary = calculateMonthSummary(incomes, fixedExpenses, investments, expenses, [], new Date('2024-09-15'));
-      expect(summary.remainingBudget).toBe(-46000);
+      expect(summary.remainingBudget).toBe(-36000);
       expect(summary.daysLeft).toBeGreaterThan(0);
       expect(summary.dailySafeLimit).toBe(0);
     });
@@ -641,15 +651,17 @@ expect(summary.sevenDayAverage).toBe(1500);
       expect(summary.investmentPlanRealizationRate).toBeCloseTo(62.5, 1);
     });
 
-    it('remainingBudget uses plannedAmount not actualAmount', () => {
+    it('remainingBudget uses netInvestment not plannedAmount', () => {
       const incomes: Income[] = [
-        { id: '1', name: 'Maaş', amount: 100000, date: '2024-01-01', recurring: true, active: true, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'u' }
+        { id: '1', name: 'Maaş', amount: 70000, date: '2024-01-01', recurring: true, active: true, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'u' },
+        { id: '2', name: 'Ek Ders', amount: 30000, date: '2024-01-01', recurring: true, active: true, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'u' },
       ];
       const investments: Investment[] = [
         { id: '1', group: 'TEFAS', name: 'TP2', plannedAmount: 20000, actualAmount: 15000, completed: false, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'u' },
       ];
       const summary = calculateMonthSummary(incomes, [], investments, [], [], new Date('2024-01-15'));
-      // remainingBudget = 100000 - 20000 (planned) = 80000
+      // extraIncome = 30000, flexAmount = 10000, netInvestment = 20000
+      // remainingBudget = 100000 - 20000 (netInvestment) = 80000
       expect(summary.remainingBudget).toBe(80000);
     });
 

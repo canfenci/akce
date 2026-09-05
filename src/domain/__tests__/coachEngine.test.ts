@@ -8,6 +8,7 @@ const summary: MonthSummary = {
   daysLeft: 20, dailySafeLimit: 2000, monthProgress: 30, budgetConsumptionRate: 60,
   threeDayAverage: 1700, sevenDayAverage: 1400, unplannedRatio: 25,
   monthEndEstimate: 55000, investmentPlanRealizationRate: 50,
+  extraIncome: 35000, flexAmount: 10000, netInvestment: 25000,
 };
 
 describe('RuleBasedCoach', () => {
