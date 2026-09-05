@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { coachProvider } from '../domain/coachEngine';
 import { calculateMonthSummary, calculateInvestmentRatio, calculateExpenseRatio, formatCurrency, formatPercentage, formatRatio, getAssetProgress, getInvestmentProgress, getInvestmentRemaining, isInvestmentCompleted, getMonthKey, getTotalAssets, getTotalAssetTargets, parseLocaleNumber, sanitizeNumericInput, getFilteredAssets, getAssetListTotal, getExtraIncome, getFlexAmount, getNetInvestment, getEmergencyFundValue, getInvestmentAllocation, type AssetFilter } from '../domain/financeEngine';
 import { formatMonthKey, getMonthCalculationDate, shiftMonthKey } from '../domain/month';
-import type { Asset, AssetGroup, AssetUnit, Income, IncomeCategory, FixedExpense, CategoryBudget, Investment, InvestmentGroup, MarketRateKey, MarketRates } from '../domain/types';
+import type { Asset, AssetGroup, AssetUnit, Expense, Income, IncomeCategory, FixedExpense, CategoryBudget, Investment, InvestmentGroup, MarketRateKey, MarketRates } from '../domain/types';
 import { ASSET_GROUPS, ASSET_GROUP_LABELS, ASSET_UNITS, ASSET_UNIT_LABELS, INVESTMENT_GROUPS, INVESTMENT_GROUP_LABELS, MARKET_RATE_KEYS, MARKET_RATE_LABELS, INCOME_CATEGORIES, INCOME_CATEGORY_LABELS } from '../domain/types';
 import { useAkceStore } from '../store/AkceStore';
 import { useAuth } from '../auth/AuthProvider';
@@ -10,8 +10,10 @@ import { getIsDeviceTrusted, setIsDeviceTrusted } from '../store/devicePreferenc
 import { Icon } from '../components/Icon';
 import { Progress } from '../components/Progress';
 import { CardActionMenu } from '../components/CardActionMenu';
+import { BudgetDonutChart, BudgetDonutLegend } from '../components/BudgetDonutChart';
 import { useDialogSheet } from '../hooks/useDialogSheet';
 import { useVisualViewportHeight } from '../hooks/useVisualViewportHeight';
+import { getIncomeChartData, getExpenseChartData, getSavingsChartData, getBudgetSummaryChartData, getIncomeChartCenter, getExpenseChartCenter, getSavingsChartCenter, getBudgetSummaryChartCenter } from '../domain/budgetCharts';
 
 const CATEGORY_COLORS = ['#538b67', '#bd8b2e', '#9a6548', '#707771', '#a74737', '#4a6fa5'];
 const titleCase = (value: string) => value.charAt(0).toLocaleUpperCase('tr-TR') + value.slice(1);
@@ -59,6 +61,22 @@ function MonthNavigation() {
     <button disabled={state.selectedMonthKey >= currentMonthKey} onClick={() => dispatch({ type: 'SET_SELECTED_MONTH', monthKey: shiftMonthKey(state.selectedMonthKey, 1) })} aria-label="Sonraki ay">›</button>
     {!hasMonthData && <button className="month-navigation__initialize" onClick={() => dispatch({ type: 'INITIALIZE_MONTH', sourceMonthKey, targetMonthKey: state.selectedMonthKey })}>Önceki ayın planıyla hazırla</button>}
   </div>;
+}
+
+function CompactMonthNav() {
+  const { state, dispatch } = useAkceStore();
+  const currentMonthKey = getMonthKey();
+  const sourceMonthKey = shiftMonthKey(state.selectedMonthKey, -1);
+  return (
+    <div className="compact-month-nav">
+      <button onClick={() => dispatch({ type: 'SET_SELECTED_MONTH', monthKey: sourceMonthKey })} aria-label="Önceki ay"><Icon name="chevron-up" /></button>
+      <div className="compact-month-nav__month">
+        <b>{formatMonthKey(state.selectedMonthKey)}</b>
+        <small>{state.selectedMonthKey === currentMonthKey ? 'Bu ay' : 'Geçmiş ay'}</small>
+      </div>
+      <button disabled={state.selectedMonthKey >= currentMonthKey} onClick={() => dispatch({ type: 'SET_SELECTED_MONTH', monthKey: shiftMonthKey(state.selectedMonthKey, 1) })} aria-label="Sonraki ay"><Icon name="chevron-down" /></button>
+    </div>
+  );
 }
 
 function Metric({ label, value, detail }: { label: string; value: string; detail?: string }) {
@@ -274,58 +292,249 @@ export function BudgetScreen({ initialTab = 'Gelir', openFormSignal, onFormSigna
 
   const deleteCategory = (id: string) => dispatch({ type: 'DELETE_CATEGORY_BUDGET', id });
 
-  return (
-  <div className="screen">
-    <PageHeader eyebrow="AYLIK PLAN" title="Bütçe" description="Parana ay başında görev ver." />
-    <MonthNavigation />
-    <nav className="tabs">{tabs.map(value => <button key={value} className={tab === value ? 'active' : ''} onClick={() => setTab(value)}>{value}</button>)}</nav>
-    {tab === 'Gelir' && <section className="data-card"><button className="add-inline" onClick={openAddIncome}><Icon name="plus" /> Yeni gelir</button><div className="data-card__header"><b>Gelir kaynakları</b><strong>{formatCurrency(summary.totalIncome)}</strong></div>{monthIncomes.map(item => <div className="data-row" key={item.id}><span className="status-dot status-dot--green"/><span className="data-row__main"><b>{item.name}</b><small>{INCOME_CATEGORY_LABELS[item.category]} · {item.recurring ? 'Her ay' : 'Tek seferlik'}</small></span><strong>{formatCurrency(item.amount)}</strong><button className="delete-button" onClick={() => openEditIncome(item)} aria-label="Geliri düzenle"><Icon name="edit" /></button><button className="delete-button" onClick={() => deleteIncome(item.id)} aria-label="Geliri sil"><Icon name="trash" /></button></div>)}</section>}
-    {tab === 'Gider' && <><section className="data-card"><button className="add-inline" onClick={openAddFixed}><Icon name="plus" /> Yeni sabit gider</button><div className="data-card__header"><b>Sabit giderler</b><span>Otomatik gider olarak etiketlenir</span></div>{monthFixedExpenses.map(item => <div className={`data-row ${item.active ? '' : 'muted-row'}`} key={item.id}><span className="date-badge">{item.dueDay}<small>GÜN</small></span><span className="data-row__main"><b>{item.name}</b><small>{item.category} · <span className="tag tag--neutral">Otomatik Gider</span></small></span><strong>{formatCurrency(item.amount)}</strong><button className="delete-button" onClick={() => openEditFixed(item)} aria-label="Gideri düzenle"><Icon name="edit" /></button><button className="delete-button" onClick={() => deleteFixed(item.id)} aria-label="Gideri sil"><Icon name="trash" /></button><button className={`switch ${item.active ? 'active' : ''}`} aria-label={`${item.name} durumunu değiştir`} onClick={() => dispatch({ type: 'TOGGLE_FIXED', id: item.id })}><span /></button></div>)}</section><section className="data-card"><div className="data-card__header"><b>Harcamalar</b>{monthExpenses.length === 0 ? <p className="empty-state">Bu ay henüz harcama yok.</p> : monthExpenses.map(exp => <div className="data-row" key={exp.id}><span className="data-row__main"><b>{exp.note ?? 'Harcama'}</b><small>{exp.category ? exp.category : 'Kategorisiz'}</small></span><strong>{formatCurrency(exp.amount)}</strong></div>)}</div></section><section className="data-card"><div className="data-card__header"><b>Kategoriler</b><button className="add-inline" onClick={openAddCategory}><Icon name="plus" /> Yeni kategori</button></div>{monthCategoryBudgets.map(cat => { const spent = monthExpenses.filter(e => e.category === cat.name).reduce((sum, e) => sum + e.amount, 0); const remaining = cat.limit - spent; const isExpanded = expandedCategory === cat.id; const catExpenses = monthExpenses.filter(e => e.category === cat.name); return (<div key={cat.id} className="accordion-row"><button className="accordion-trigger" onClick={() => setExpandedCategory(isExpanded ? null : cat.id)} aria-expanded={isExpanded}><span className="accordion-trigger__main"><span className="accordion-trigger__name"><span className="category-dot" style={{ background: cat.color }}/>{cat.name}</span><span className="accordion-trigger__summary">{formatCurrency(spent)} / {formatCurrency(cat.limit)}</span></span><Icon name={isExpanded ? 'chevron-up' : 'chevron-down'} /></button>{isExpanded && <div className="accordion-content"><div className="accordion-detail"><span>Limit</span><b>{formatCurrency(cat.limit)}</b></div><div className="accordion-detail"><span>Harcanan</span><b>{formatCurrency(spent)}</b></div><div className="accordion-detail"><span>Kalan</span><b>{formatCurrency(remaining)}</b></div>{catExpenses.length > 0 && <><div className="accordion-divider"/><div className="accordion-subheader">Harcamalar</div>{catExpenses.map(exp => <div className="accordion-detail" key={exp.id}><span>{exp.note || exp.category || 'Kategorisiz'}</span><b>-{formatCurrency(exp.amount)}</b></div>)}</>}<div className="accordion-actions"><button className="text-button" onClick={() => openEditCategory(cat)} aria-label="Kategoriyi düzenle"><Icon name="edit" /> Düzenle</button><button className="text-button text-button--danger" onClick={() => deleteCategory(cat.id)} aria-label="Kategoriyi sil"><Icon name="trash" /> Sil</button></div></div>}</div>); })}</section></>}
-    {tab === 'Birikim' && <section className="data-card"><div className="data-card__header"><b>Birikim</b></div><div className="data-row"><span className="data-row__main"><b>Ek Ders + Özel Ders</b></span><strong>{formatCurrency(extraIncome)}</strong></div><div className="data-row"><span className="data-row__main"><b>Hediye-Bağış</b><small>Esneme Payı</small></span><strong>{formatCurrency(flexAmount)}</strong></div><div className="data-row"><span className="data-row__main"><b>Net Yatırım</b></span><strong>{formatCurrency(netInvestment)}</strong></div><div className="section-divider"/><div className="data-card__header"><b>Dağılım</b></div><div className="data-row"><span className="data-row__main"><b>Acil Fon TP2</b><small>%30</small></span><strong>{formatCurrency(investmentAllocation.tp2)}</strong></div><div className="data-row"><span className="data-row__main"><b>Hisse Senedi Fonları</b><small>%40</small></span><strong>{formatCurrency(investmentAllocation.hisse)}</strong></div><div className="data-row"><span className="data-row__main"><b>Altın-Gümüş</b><small>%20</small></span><strong>{formatCurrency(investmentAllocation.altinGumus)}</strong></div><div className="data-row"><span className="data-row__main"><b>Nasdaq</b><small>%10</small></span><strong>{formatCurrency(investmentAllocation.nasdaq)}</strong></div></section>}
-    {tab === 'Özet' && <section className="data-card"><div className="data-card__header"><b>Aylık özet</b></div><div className="metric-grid"><div className="metric metric--lead"><span>Gelir Toplamı</span><strong>{formatCurrency(summary.totalIncome)}</strong></div><Metric label="Gider Toplamı" value={formatCurrency(summary.totalAutomaticExpenses + summary.totalVariableExpenses)} /><Metric label="Birikim Toplamı" value={formatCurrency(summary.netInvestment)} /><Metric label="Hediye-Bağış" value={formatCurrency(summary.flexAmount)} /></div></section>}
+  // AKÇE-052: Chart data computations
+  const incomeChartSlices = useMemo(() => getIncomeChartData(state.incomes, state.selectedMonthKey), [state.incomes, state.selectedMonthKey]);
+  const incomeChartCenter = useMemo(() => getIncomeChartCenter(state.incomes, state.selectedMonthKey), [state.incomes, state.selectedMonthKey]);
+  const incomeChartTotal = useMemo(() => incomeChartSlices.reduce((sum, s) => sum + s.value, 0), [incomeChartSlices]);
 
-    {incomeForm.isOpen && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) closeIncomeForm(); }}>
-      <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="income-title" ref={incomeSheetRef} style={{ maxHeight: sheetMaxHeight }}>
-        <div className="sheet__handle" />
-        <header className="sheet__header"><div><span className="eyebrow">GELİR</span><h2 id="income-title">{incomeForm.mode === 'add' ? 'Yeni gelir' : 'Geliri düzenle'}</h2></div><button className="icon-button" onClick={closeIncomeForm} aria-label="Kapat"><Icon name="close" /></button></header>
-        <label className="field">Kategori<select value={incomeCategory} onChange={e => setIncomeCategory(e.target.value as IncomeCategory)}>{INCOME_CATEGORIES.map(cat => <option key={cat} value={cat}>{INCOME_CATEGORY_LABELS[cat]}</option>)}</select></label>
-        <label className="field">Ad <input value={incomeName} onChange={e => { setIncomeName(e.target.value); setIncomeError(''); }} placeholder="Örn: Maaş" /></label>
-        <label className="amount-input"><span>Tutar</span><div><input inputMode="decimal" value={incomeAmount} onChange={e => { setIncomeAmount(sanitizeNumericInput(e.target.value)); setIncomeError(''); }} placeholder="0" aria-label="Gelir tutarı" /><b>TL</b></div></label>
-        <label className="field"><input type="checkbox" checked={incomeRecurring} onChange={e => setIncomeRecurring(e.target.checked)} /> Her ay tekrarlanan gelir</label>
-        {incomeError && <p className="form-error">{incomeError}</p>}
-        <button className="primary-button" onClick={saveIncome}>{incomeForm.mode === 'add' ? 'Geliri kaydet' : 'Güncelle'}</button>
-      </section>
-    </div>}
+  const expenseChartSlices = useMemo(() => getExpenseChartData(state.fixedExpenses, state.expenses, state.selectedMonthKey), [state.fixedExpenses, state.expenses, state.selectedMonthKey]);
+  const expenseChartCenter = useMemo(() => getExpenseChartCenter(state.fixedExpenses, state.expenses, state.selectedMonthKey), [state.fixedExpenses, state.expenses, state.selectedMonthKey]);
+  const expenseChartTotal = useMemo(() => expenseChartSlices.reduce((sum, s) => sum + s.value, 0), [expenseChartSlices]);
 
-    {fixedForm.isOpen && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) closeFixedForm(); }}>
-      <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="fixed-title" ref={fixedSheetRef} style={{ maxHeight: sheetMaxHeight }}>
-        <div className="sheet__handle" />
-        <header className="sheet__header"><div><span className="eyebrow">OTOMATİK GİDER</span><h2 id="fixed-title">{fixedForm.mode === 'add' ? 'Yeni otomatik gider' : 'Gideri düzenle'}</h2></div><button className="icon-button" onClick={closeFixedForm} aria-label="Kapat"><Icon name="close" /></button></header>
-        <label className="field">Ad <input value={fixedName} onChange={e => { setFixedName(e.target.value); setFixedError(''); }} placeholder="Örn: Netflix" /></label>
-        <label className="amount-input"><span>Tutar</span><div><input inputMode="decimal" value={fixedAmount} onChange={e => { setFixedAmount(sanitizeNumericInput(e.target.value)); setFixedError(''); }} placeholder="0" aria-label="Gider tutarı" /><b>TL</b></div></label>
-        <div className="form-grid"><label>Gün (1-31) <input inputMode="numeric" value={fixedDueDay} onChange={e => { setFixedDueDay(e.target.value.replace(/[^0-9]/g, '')); setFixedError(''); }} /></label><label>Kategori<select value={fixedCategory} onChange={e => setFixedCategory(e.target.value)}>{uniqueCategories.map(c => <option key={c}>{c}</option>)}</select></label></div>
-        <fieldset className="segmented"><legend>Sıklık</legend>{(['monthly', 'yearly'] as const).map(value => <button type="button" key={value} className={fixedFrequency === value ? 'active' : ''} onClick={() => setFixedFrequency(value)}>{value === 'monthly' ? 'Aylık' : 'Yıllık'}</button>)}</fieldset>
-        {fixedError && <p className="form-error">{fixedError}</p>}
-        <button className="primary-button" onClick={saveFixed}>{fixedForm.mode === 'add' ? 'Gideri kaydet' : 'Güncelle'}</button>
-      </section>
-</div>}
+  const savingsChartSlices = useMemo(() => getSavingsChartData(state.incomes, state.assets, state.assetLists, state.selectedMonthKey), [state.incomes, state.assets, state.assetLists, state.selectedMonthKey]);
+  const savingsChartCenter = useMemo(() => getSavingsChartCenter(state.incomes, state.assets, state.assetLists, state.selectedMonthKey), [state.incomes, state.assets, state.assetLists, state.selectedMonthKey]);
+  const savingsChartTotal = useMemo(() => savingsChartSlices.reduce((sum, s) => sum + s.value, 0), [savingsChartSlices]);
 
-    {categoryForm.isOpen && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) closeCategoryForm(); }}>
-      <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="category-title" ref={categorySheetRef} style={{ maxHeight: sheetMaxHeight }}>
-        <div className="sheet__handle" />
-        <header className="sheet__header"><div><span className="eyebrow">KATEGORİ BÜTÇESİ</span><h2 id="category-title">{categoryForm.mode === 'add' ? 'Yeni kategori bütçesi' : 'Kategori bütçesini düzenle'}</h2></div><button className="icon-button" onClick={closeCategoryForm} aria-label="Kapat"><Icon name="close" /></button></header>
-        <label className="field">Ad <input value={categoryName} onChange={e => { setCategoryName(e.target.value); setCategoryError(''); }} placeholder="Örn: Market" /></label>
-        <label className="amount-input"><span>Limit</span><div><input inputMode="decimal" value={categoryLimit} onChange={e => { setCategoryLimit(sanitizeNumericInput(e.target.value)); setCategoryError(''); }} placeholder="0" aria-label="Kategori limiti" /><b>TL</b></div></label>
-        <label className="field">Renk
-          <div className="color-swatches">
-            {CATEGORY_COLORS.map(hex => <button key={hex} type="button" className={`color-swatch${categoryColor === hex ? ' active' : ''}`} style={{ background: hex }} onClick={() => { setCategoryColor(hex); setCategoryError(''); }} aria-label={hex} />)}
+  const summaryChartSlices = useMemo(() => getBudgetSummaryChartData(state.incomes, state.fixedExpenses, state.expenses, state.selectedMonthKey), [state.incomes, state.fixedExpenses, state.expenses, state.selectedMonthKey]);
+  const summaryChartCenter = useMemo(() => getBudgetSummaryChartCenter(state.incomes, state.selectedMonthKey), [state.incomes, state.selectedMonthKey]);
+  const summaryChartTotal = useMemo(() => summaryChartSlices.reduce((sum, s) => sum + s.value, 0), [summaryChartSlices]);
+
+  // AKÇE-052: Expense delete confirmation
+  const [deleteExpenseConfirm, setDeleteExpenseConfirm] = useState<{ isOpen: boolean; expense?: Expense }>({ isOpen: false });
+  const openDeleteExpense = (expense: Expense) => setDeleteExpenseConfirm({ isOpen: true, expense });
+  const closeDeleteExpense = () => setDeleteExpenseConfirm({ isOpen: false });
+  const deleteSheetRef = useDialogSheet(deleteExpenseConfirm.isOpen, closeDeleteExpense);
+  const confirmDeleteExpense = () => {
+    if (deleteExpenseConfirm.expense) {
+      dispatch({ type: 'REMOVE_EXPENSE', id: deleteExpenseConfirm.expense.id });
+    }
+    closeDeleteExpense();
+  };
+
+  const renderBudgetTab = () => {
+    if (tab === 'Gelir') {
+      return (
+        <div className="budget-tab">
+          <section className="data-card">
+            <BudgetDonutChart slices={incomeChartSlices} centerValue={incomeChartCenter.value} centerLabel={incomeChartCenter.label} total={incomeChartTotal} size={200} />
+            <BudgetDonutLegend slices={incomeChartSlices} />
+          </section>
+          <section className="data-card">
+            <button className="add-inline" onClick={openAddIncome}><Icon name="plus" /> Yeni gelir</button>
+            <div className="data-card__header"><b>Gelir kaynakları</b><strong>{formatCurrency(summary.totalIncome)}</strong></div>
+            {monthIncomes.map(item => (
+              <div className="data-row" key={item.id}>
+                <span className="status-dot status-dot--green"/>
+                <span className="data-row__main">
+                  <b>{item.name}</b>
+                  <small>{INCOME_CATEGORY_LABELS[item.category]} · {item.recurring ? 'Her ay' : 'Tek seferlik'}</small>
+                </span>
+                <strong>{formatCurrency(item.amount)}</strong>
+                <button className="delete-button" onClick={() => openEditIncome(item)} aria-label="Geliri düzenle"><Icon name="edit" /></button>
+                <button className="delete-button" onClick={() => deleteIncome(item.id)} aria-label="Geliri sil"><Icon name="trash" /></button>
+              </div>
+            ))}
+          </section>
+        </div>
+      );
+    }
+
+    if (tab === 'Gider') {
+      return (
+        <div className="budget-tab">
+          <section className="data-card">
+            <BudgetDonutChart slices={expenseChartSlices} centerValue={expenseChartCenter.value} centerLabel={expenseChartCenter.label} total={expenseChartTotal} size={200} />
+            <BudgetDonutLegend slices={expenseChartSlices} />
+          </section>
+          <section className="data-card">
+            <button className="add-inline" onClick={openAddFixed}><Icon name="plus" /> Yeni sabit gider</button>
+            <div className="data-card__header"><b>Sabit giderler</b><span>Otomatik gider olarak etiketlenir</span></div>
+            {monthFixedExpenses.map(item => (
+              <div className={`data-row ${item.active ? '' : 'muted-row'}`} key={item.id}>
+                <span className="date-badge">{item.dueDay}<small>GÜN</small></span>
+                <span className="data-row__main"><b>{item.name}</b><small>{item.category} · <span className="tag tag--neutral">Otomatik Gider</span></small></span>
+                <strong>{formatCurrency(item.amount)}</strong>
+                <button className="delete-button" onClick={() => openEditFixed(item)} aria-label="Gideri düzenle"><Icon name="edit" /></button>
+                <button className="delete-button" onClick={() => deleteFixed(item.id)} aria-label="Gideri sil"><Icon name="trash" /></button>
+                <button className={`switch ${item.active ? 'active' : ''}`} aria-label={`${item.name} durumunu değiştir`} onClick={() => dispatch({ type: 'TOGGLE_FIXED', id: item.id })}><span /></button>
+              </div>
+            ))}
+          </section>
+          <section className="data-card">
+            <div className="data-card__header"><b>Harcamalar</b></div>
+            {monthExpenses.length === 0 ? (
+              <p className="empty-state">Bu ay henüz harcama yok.</p>
+            ) : (
+              monthExpenses.map(exp => (
+                <div className="data-row" key={exp.id}>
+                  <span className="data-row__main"><b>{exp.note ?? exp.category ?? 'Harcama'}</b><small>{exp.category ? exp.category : 'Kategorisiz'}</small></span>
+                  <strong>{formatCurrency(exp.amount)}</strong>
+                  <CardActionMenu actions={[{ label: 'Sil', onAction: () => openDeleteExpense(exp), icon: 'trash', destructive: true }]} ariaLabel="Harcama işlemleri" />
+                </div>
+              ))
+            )}
+          </section>
+          <section className="data-card">
+            <div className="data-card__header"><b>Kategoriler</b>
+              <button className="add-inline" onClick={openAddCategory}><Icon name="plus" /> Yeni kategori</button>
+            </div>
+            {monthCategoryBudgets.map(cat => {
+              const spent = monthExpenses.filter(e => e.category === cat.name).reduce((sum, e) => sum + e.amount, 0);
+              const remaining = cat.limit - spent;
+              const isExpanded = expandedCategory === cat.id;
+              const catExpenses = monthExpenses.filter(e => e.category === cat.name);
+              return (
+                <div key={cat.id} className="accordion-row">
+                  <button className="accordion-trigger" onClick={() => setExpandedCategory(isExpanded ? null : cat.id)} aria-expanded={isExpanded}>
+                    <span className="accordion-trigger__main">
+                      <span className="accordion-trigger__name">
+                        <span className="category-dot" style={{ background: cat.color }}/>{cat.name}
+                      </span>
+                      <span className="accordion-trigger__summary">{formatCurrency(spent)} / {formatCurrency(cat.limit)} <small>(Kalan: {formatCurrency(remaining)})</small></span>
+                    </span>
+                    <span className="accordion-trigger__arrow" />
+                  </button>
+                  <button className="delete-button" onClick={() => openEditCategory(cat)} aria-label="Kategoriyi düzenle"><Icon name="edit" /></button>
+                  <button className="delete-button" onClick={() => deleteCategory(cat.id)} aria-label="Kategoriyi sil"><Icon name="trash" /></button>
+                  <div className="accordion-content">
+                    {catExpenses.map(e => (
+                      <div className="accordion-expense" key={e.id}>
+                        <span className="expense-name">{e.note ?? e.category ?? 'Harcama'}</span>
+                        <small>{e.category ? e.category : 'Kategorisiz'}</small>
+                        <strong>{formatCurrency(e.amount)}</strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </section>
+        </div>
+      );
+    }
+
+    if (tab === 'Birikim') {
+      return (
+        <div className="budget-tab">
+          <section className="data-card">
+            <BudgetDonutChart slices={savingsChartSlices} centerValue={savingsChartCenter.value} centerLabel={savingsChartCenter.label} total={savingsChartTotal} size={200} />
+            <BudgetDonutLegend slices={savingsChartSlices} />
+          </section>
+          <section className="data-card">
+            <div className="data-card__header"><b>Birikim</b></div>
+            <div className="data-row"><span className="data-row__main"><b>Ek Ders + Özel Ders</b></span><strong>{formatCurrency(extraIncome)}</strong></div>
+            <div className="data-row"><span className="data-row__main"><b>Hediye-Bağış</b><small>Esneme Payı</small></span><strong>{formatCurrency(flexAmount)}</strong></div>
+            <div className="data-row"><span className="data-row__main"><b>Net Yatırım</b></span><strong>{formatCurrency(netInvestment)}</strong></div>
+            <div className="section-divider"/>
+            <div className="data-card__header"><b>Dağılım</b></div>
+            <div className="data-row"><span className="data-row__main"><b>Acil Fon TP2</b><small>%{investmentAllocation.tp2 > 0 ? Math.round((investmentAllocation.tp2 / netInvestment) * 100) : 30}</small></span><strong>{formatCurrency(investmentAllocation.tp2)}</strong></div>
+            <div className="data-row"><span className="data-row__main"><b>Hisse Senedi Fonları</b><small>%{investmentAllocation.hisse > 0 ? Math.round((investmentAllocation.hisse / netInvestment) * 100) : 40}</small></span><strong>{formatCurrency(investmentAllocation.hisse)}</strong></div>
+            <div className="data-row"><span className="data-row__main"><b>Altın-Gümüş</b><small>%{investmentAllocation.altinGumus > 0 ? Math.round((investmentAllocation.altinGumus / netInvestment) * 100) : 20}</small></span><strong>{formatCurrency(investmentAllocation.altinGumus)}</strong></div>
+            <div className="data-row"><span className="data-row__main"><b>Nasdaq</b><small>%{investmentAllocation.nasdaq > 0 ? Math.round((investmentAllocation.nasdaq / netInvestment) * 100) : 10}</small></span><strong>{formatCurrency(investmentAllocation.nasdaq)}</strong></div>
+          </section>
+        </div>
+      );
+    }
+
+    return (
+      <div className="budget-tab">
+        <section className="data-card">
+          <BudgetDonutChart slices={summaryChartSlices} centerValue={summaryChartCenter.value} centerLabel={summaryChartCenter.label} total={summaryChartTotal} size={200} />
+          <BudgetDonutLegend slices={summaryChartSlices} />
+        </section>
+        <section className="data-card">
+          <div className="data-card__header"><b>Aylık özet</b></div>
+          <div className="metric-grid">
+            <div className="metric metric--lead"><span>Gelir Toplamı</span><strong>{formatCurrency(summary.totalIncome)}</strong></div>
+            <Metric label="Gider Toplamı" value={formatCurrency(summary.totalAutomaticExpenses + summary.totalVariableExpenses)} />
+            <Metric label="Birikim Toplamı" value={formatCurrency(summary.netInvestment)} />
+            <Metric label="Hediye-Bağış" value={formatCurrency(summary.flexAmount)} />
           </div>
-        </label>
-        {categoryError && <p className="form-error">{categoryError}</p>}
-        <button className="primary-button" onClick={saveCategory}>{categoryForm.mode === 'add' ? 'Kategori kaydet' : 'Güncelle'}</button>
-      </section>
-    </div>}
-  </div>
+        </section>
+      </div>
+    );
+  };
+
+  return (
+    <div className="screen">
+      <div className="month-header">
+        <div className="page-header">
+          <div>
+            <span className="eyebrow">AYLIK PLAN</span>
+            <h1>Bütçe</h1>
+            <p>Parana ay başında görev ver.</p>
+          </div>
+        </div>
+        <CompactMonthNav />
+      </div>
+      <nav className="tabs">{tabs.map(value => <button key={value} className={tab === value ? 'active' : ''} onClick={() => setTab(value)}>{value}</button>)}</nav>
+      {renderBudgetTab()}
+
+      {incomeForm.isOpen && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) closeIncomeForm(); }}>
+        <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="income-title" ref={incomeSheetRef} style={{ maxHeight: sheetMaxHeight }}>
+          <div className="sheet__handle" />
+          <header className="sheet__header"><div><span className="eyebrow">GELİR</span><h2 id="income-title">{incomeForm.mode === 'add' ? 'Yeni gelir' : 'Geliri düzenle'}</h2></div><button className="icon-button" onClick={closeIncomeForm} aria-label="Kapat"><Icon name="close" /></button></header>
+          <label className="field">Kategori<select value={incomeCategory} onChange={e => setIncomeCategory(e.target.value as IncomeCategory)}>{INCOME_CATEGORIES.map(cat => <option key={cat} value={cat}>{INCOME_CATEGORY_LABELS[cat]}</option>)}</select></label>
+          <label className="field">Ad <input value={incomeName} onChange={e => { setIncomeName(e.target.value); setIncomeError(''); }} placeholder="Örn: Maaş" /></label>
+          <label className="amount-input"><span>Tutar</span><div><input inputMode="decimal" value={incomeAmount} onChange={e => { setIncomeAmount(sanitizeNumericInput(e.target.value)); setIncomeError(''); }} placeholder="0" aria-label="Gelir tutarı" /><b>TL</b></div></label>
+          <label className="field"><input type="checkbox" checked={incomeRecurring} onChange={e => setIncomeRecurring(e.target.checked)} /> Her ay tekrarlanan gelir</label>
+          {incomeError && <p className="form-error">{incomeError}</p>}
+          <button className="primary-button" onClick={saveIncome}>{incomeForm.mode === 'add' ? 'Geliri kaydet' : 'Güncelle'}</button>
+        </section>
+      </div>}
+
+      {fixedForm.isOpen && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) closeFixedForm(); }}>
+        <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="fixed-title" ref={fixedSheetRef} style={{ maxHeight: sheetMaxHeight }}>
+          <div className="sheet__handle" />
+          <header className="sheet__header"><div><span className="eyebrow">OTOMATİK GİDER</span><h2 id="fixed-title">{fixedForm.mode === 'add' ? 'Yeni otomatik gider' : 'Gideri düzenle'}</h2></div><button className="icon-button" onClick={closeFixedForm} aria-label="Kapat"><Icon name="close" /></button></header>
+          <label className="field">Ad <input value={fixedName} onChange={e => { setFixedName(e.target.value); setFixedError(''); }} placeholder="Örn: Netflix" /></label>
+          <label className="amount-input"><span>Tutar</span><div><input inputMode="decimal" value={fixedAmount} onChange={e => { setFixedAmount(sanitizeNumericInput(e.target.value)); setFixedError(''); }} placeholder="0" aria-label="Gider tutarı" /><b>TL</b></div></label>
+          <div className="form-grid"><label>Gün (1-31) <input inputMode="numeric" value={fixedDueDay} onChange={e => { setFixedDueDay(e.target.value.replace(/[^0-9]/g, '')); setFixedError(''); }} /></label><label>Kategori<select value={fixedCategory} onChange={e => setFixedCategory(e.target.value)}>{uniqueCategories.map(c => <option key={c}>{c}</option>)}</select></label></div>
+          <fieldset className="segmented"><legend>Sıklık</legend>{(['monthly', 'yearly'] as const).map(value => <button type="button" key={value} className={fixedFrequency === value ? 'active' : ''} onClick={() => setFixedFrequency(value)}>{value === 'monthly' ? 'Aylık' : 'Yıllık'}</button>)}</fieldset>
+          {fixedError && <p className="form-error">{fixedError}</p>}
+          <button className="primary-button" onClick={saveFixed}>{fixedForm.mode === 'add' ? 'Gideri kaydet' : 'Güncelle'}</button>
+        </section>
+      </div>}
+
+      {categoryForm.isOpen && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) closeCategoryForm(); }}>
+        <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="category-title" ref={categorySheetRef} style={{ maxHeight: sheetMaxHeight }}>
+          <div className="sheet__handle" />
+          <header className="sheet__header"><div><span className="eyebrow">KATEGORİ BÜTÇESİ</span><h2 id="category-title">{categoryForm.mode === 'add' ? 'Yeni kategori bütçesi' : 'Kategori bütçesini düzenle'}</h2></div><button className="icon-button" onClick={closeCategoryForm} aria-label="Kapat"><Icon name="close" /></button></header>
+          <label className="field">Ad <input value={categoryName} onChange={e => { setCategoryName(e.target.value); setCategoryError(''); }} placeholder="Örn: Market" /></label>
+          <label className="amount-input"><span>Limit</span><div><input inputMode="decimal" value={categoryLimit} onChange={e => { setCategoryLimit(sanitizeNumericInput(e.target.value)); setCategoryError(''); }} placeholder="0" aria-label="Kategori limiti" /><b>TL</b></div></label>
+          <label className="field">Renk
+            <div className="color-swatches">
+              {CATEGORY_COLORS.map(hex => <button key={hex} type="button" className={`color-swatch${categoryColor === hex ? ' active' : ''}`} style={{ background: hex }} onClick={() => { setCategoryColor(hex); setCategoryError(''); }} aria-label={hex} />)}
+            </div>
+          </label>
+          {categoryError && <p className="form-error">{categoryError}</p>}
+          <button className="primary-button" onClick={saveCategory}>{categoryForm.mode === 'add' ? 'Kategori kaydet' : 'Güncelle'}</button>
+        </section>
+      </div>}
+
+      {deleteExpenseConfirm.isOpen && <div className="sheet-layer" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) closeDeleteExpense(); }}>
+        <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="delete-expense-title" ref={deleteSheetRef} style={{ maxHeight: sheetMaxHeight }}>
+          <div className="sheet__handle" />
+          <header className="sheet__header"><div><h2 id="delete-expense-title">Harcamayı Sil</h2></div><button className="icon-button" onClick={closeDeleteExpense} aria-label="Kapat"><Icon name="close" /></button></header>
+          <p>{deleteExpenseConfirm.expense ? `Bu harcamayı silmek istediğine emin misin?` : 'Harcama bulunamadı.'}</p>
+          {deleteExpenseConfirm.expense && <div className="data-row"><span className="data-row__main"><b>{deleteExpenseConfirm.expense.note ?? 'Harcama'}</b><small>{deleteExpenseConfirm.expense.category ? deleteExpenseConfirm.expense.category : 'Kategorisiz'}</small></span><strong>-{formatCurrency(deleteExpenseConfirm.expense.amount)}</strong></div>}
+          <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+            <button className="primary-button" style={{ flex: 1, background: 'var(--danger)', color: '#fff' }} onClick={confirmDeleteExpense}>Sil</button>
+            <button className="primary-button" style={{ flex: 1, background: 'var(--cold-stone)', color: 'var(--night-navy)' }} onClick={closeDeleteExpense}>İptal</button>
+          </div>
+        </section>
+      </div>}
+    </div>
   );
 }
 export function InvestmentsScreen({ openFormSignal, onFormSignalConsumed }: { openFormSignal?: string | null; onFormSignalConsumed?: () => void }) {
