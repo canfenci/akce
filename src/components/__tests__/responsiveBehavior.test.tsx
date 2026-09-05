@@ -484,11 +484,11 @@ describe('UX polish pack', () => {
     expect(heading.textContent).toMatch(/^Merhaba/);
   });
 
-  it('BudgetScreen shows Toplam gelir as lead metric', async () => {
+  it('BudgetScreen shows Gelir Toplamı as lead metric', async () => {
     const { BudgetScreen } = await import('../../features/Screens');
     const wrapper = createTestWrapper();
-    render(<BudgetScreen />, { wrapper });
-    expect(screen.getByText('Toplam gelir')).toBeTruthy();
+    render(<BudgetScreen initialTab="Özet" />, { wrapper });
+    expect(screen.getByText('Gelir Toplamı')).toBeTruthy();
     const leadMetric = document.querySelector('.metric--lead');
     expect(leadMetric).toBeTruthy();
   });
