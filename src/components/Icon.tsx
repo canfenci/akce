@@ -1,6 +1,6 @@
 import type { SVGProps } from 'react';
 
-export type IconName = 'home' | 'wallet' | 'plus' | 'target' | 'spark' | 'settings' | 'menu' | 'close' | 'arrow' | 'receipt' | 'chart' | 'check' | 'edit' | 'trash' | 'calendar' | 'card' | 'info' | 'more';
+export type IconName = 'home' | 'wallet' | 'plus' | 'target' | 'spark' | 'settings' | 'menu' | 'close' | 'arrow' | 'receipt' | 'chart' | 'check' | 'edit' | 'trash' | 'calendar' | 'card' | 'info' | 'more' | 'chevron-up' | 'chevron-down';
 
 const paths: Record<IconName, React.ReactNode> = {
   home: <><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10M9 20v-6h6v6"/></>,
@@ -15,6 +15,8 @@ const paths: Record<IconName, React.ReactNode> = {
   calendar: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/></>, card: <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></>,
   info: <><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></>,
   more: <><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/><circle cx="5" cy="12" r="1.5"/></>,
+  'chevron-up': <path d="m18 15-6-6-6 6"/>,
+  'chevron-down': <path d="m6 9 6 6 6-6"/>,
 };
 
 export function Icon({ name, ...props }: { name: IconName } & SVGProps<SVGSVGElement>) {
