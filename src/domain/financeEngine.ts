@@ -230,3 +230,20 @@ export function getAssetListTotal(assets: Asset[], listId: string): number {
     .filter(a => a.assetListId === listId)
     .reduce((sum, a) => sum + (a.currentAmount || 0), 0);
 }
+
+export type AssetFilter = { type: 'all' } | { type: 'listless' } | { type: 'list'; listId: string };
+
+export function getFilteredAssets(assets: Asset[], filter: AssetFilter): Asset[] {
+  switch (filter.type) {
+    case 'all':
+      return assets;
+    case 'listless':
+      return assets.filter(a => !a.assetListId);
+    case 'list':
+      return assets.filter(a => a.assetListId === filter.listId);
+  }
+}
+
+export function getListlessAssets(assets: Asset[]): Asset[] {
+  return assets.filter(a => !a.assetListId);
+}

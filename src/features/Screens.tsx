@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { coachProvider } from '../domain/coachEngine';
-import { calculateMonthSummary, calculateInvestmentRatio, calculateExpenseRatio, formatCurrency, formatPercentage, formatRatio, getAssetProgress, getInvestmentProgress, getInvestmentRemaining, isInvestmentCompleted, getMonthKey, getTotalAssets, getTotalAssetTargets, parseLocaleNumber, sanitizeNumericInput } from '../domain/financeEngine';
+import { calculateMonthSummary, calculateInvestmentRatio, calculateExpenseRatio, formatCurrency, formatPercentage, formatRatio, getAssetProgress, getInvestmentProgress, getInvestmentRemaining, isInvestmentCompleted, getMonthKey, getTotalAssets, getTotalAssetTargets, parseLocaleNumber, sanitizeNumericInput, getFilteredAssets, getAssetListTotal, type AssetFilter } from '../domain/financeEngine';
 import { formatMonthKey, getMonthCalculationDate, shiftMonthKey } from '../domain/month';
 import type { Asset, AssetGroup, AssetUnit, Income, FixedExpense, CategoryBudget, Investment, InvestmentGroup, MarketRateKey, MarketRates } from '../domain/types';
 import { ASSET_GROUPS, ASSET_GROUP_LABELS, ASSET_UNITS, ASSET_UNIT_LABELS, INVESTMENT_GROUPS, INVESTMENT_GROUP_LABELS, MARKET_RATE_KEYS, MARKET_RATE_LABELS } from '../domain/types';
@@ -484,6 +484,27 @@ export function AssetsScreen({ openFormSignal, onFormSignalConsumed }: { openFor
   const target = getTotalAssetTargets(state.assets);
   const goal = state.goals[0];
 
+  const [assetFilter, setAssetFilter] = useState<AssetFilter>({ type: 'all' });
+
+  useEffect(() => {
+    if (assetFilter.type === 'list') {
+      const exists = state.assetLists.some(l => l.id === assetFilter.listId);
+      if (!exists) setAssetFilter({ type: 'all' });
+    }
+  }, [state.assetLists, assetFilter]);
+
+  const filteredAssets = useMemo(() => getFilteredAssets(state.assets, assetFilter), [state.assets, assetFilter]);
+  const selectedListTotal = useMemo(() => {
+    if (assetFilter.type === 'all') return total;
+    if (assetFilter.type === 'listless') return state.assets.filter(a => !a.assetListId).reduce((s, a) => s + (a.currentAmount || 0), 0);
+    return getAssetListTotal(state.assets, assetFilter.listId);
+  }, [state.assets, assetFilter, total]);
+  const selectedListName = useMemo(() => {
+    if (assetFilter.type === 'all') return null;
+    if (assetFilter.type === 'listless') return 'Listesiz';
+    return state.assetLists.find(l => l.id === assetFilter.listId)?.name ?? 'Liste';
+  }, [assetFilter, state.assetLists]);
+
   const [assetForm, setAssetForm] = useState<AssetFormState>({ isOpen: false, mode: 'add' });
   const [assetGroup, setAssetGroup] = useState<AssetGroup>('Altın');
   const [assetName, setAssetName] = useState('');
@@ -591,9 +612,29 @@ export function AssetsScreen({ openFormSignal, onFormSignalConsumed }: { openFor
 
     <button className="add-inline" onClick={openAddAsset}><Icon name="plus" /> Varlık ekle</button>
 
+    {state.assets.length > 0 && state.assetLists.length > 0 && (
+      <div className="filter-row" role="tablist" aria-label="Varlık filtresi">
+        <button role="tab" aria-selected={assetFilter.type === 'all'} className={assetFilter.type === 'all' ? 'active' : ''} onClick={() => setAssetFilter({ type: 'all' })}>Tümü</button>
+        {state.assetLists.map(list => (
+          <button key={list.id} role="tab" aria-selected={assetFilter.type === 'list' && assetFilter.listId === list.id} className={assetFilter.type === 'list' && assetFilter.listId === list.id ? 'active' : ''} onClick={() => setAssetFilter({ type: 'list', listId: list.id })}>{list.name}</button>
+        ))}
+        <button role="tab" aria-selected={assetFilter.type === 'listless'} className={assetFilter.type === 'listless' ? 'active' : ''} onClick={() => setAssetFilter({ type: 'listless' })}>Listesiz</button>
+      </div>
+    )}
+
+    {selectedListName && assetFilter.type !== 'all' && (
+      <section className="selected-list-summary">
+        <span className="selected-list-summary__name">{selectedListName}</span>
+        <span className="selected-list-summary__total">{formatCurrency(selectedListTotal)}</span>
+        <span className="selected-list-summary__count">{filteredAssets.length} varlık</span>
+      </section>
+    )}
+
     {state.assets.length === 0
       ? <section className="empty-state"><Icon name="target" /><p><b>Henüz varlık eklemedin.</b></p><small>İlk varlığını ekleyerek finansal özgürlük takibini başlat.</small></section>
-      : <section className="asset-grid">{state.assets.map(asset => {
+      : filteredAssets.length === 0
+        ? <section className="empty-state"><Icon name="target" /><p><b>{selectedListName ? `${selectedListName} listesinde henüz varlık yok.` : 'Listesiz varlık bulunmuyor.'}</b></p><small>Varlık ekleyerek başlayın.</small><button className="primary-button" onClick={openAddAsset}><Icon name="plus" /> Varlık ekle</button></section>
+        : <section className="asset-grid">{filteredAssets.map(asset => {
           return <article className="asset-card asset-card--compact" key={asset.id}>
             <header>
               <span className="asset-monogram">{asset.group.slice(0, 2).toLocaleUpperCase('tr-TR')}</span>
