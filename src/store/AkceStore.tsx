@@ -38,7 +38,7 @@ export type Action =
   | { type: 'RESET_FINANCE_DATA' }
   | { type: 'SYNC_HYDRATE_STATE'; state: AkceData }
   | { type: 'SYNC_SUBSCRIPTION_UPDATE'; update: FinanceSubscriptionUpdate }
-  | { type: 'SYNC_MARKET_RATES_UPDATE'; rates: Record<string, number> }
+  | { type: 'SYNC_MARKET_RATES_UPDATE'; rates: Record<string, number>; updatedAt: number }
   | { type: 'UPDATE_MARKET_RATES'; payload: MarketRates }
   | { type: 'REVALUE_ASSETS' }
   | { type: 'ADD_ASSET_LIST'; payload: AssetList }
@@ -119,9 +119,9 @@ export function reducer(state: AkceData, action: Action): AkceData {
         }
       }
       const revalued = state.assets.map(a => revalueAsset(a, ratesRecord));
-      return { ...state, marketRates: ratesRecord, assets: revalued };
+      return { ...state, marketRates: ratesRecord, marketRatesUpdatedAt: Date.now(), assets: revalued };
     }
-    case 'SYNC_MARKET_RATES_UPDATE': return { ...state, marketRates: action.rates };
+    case 'SYNC_MARKET_RATES_UPDATE': return { ...state, marketRates: action.rates, marketRatesUpdatedAt: action.updatedAt };
     case 'REVALUE_ASSETS': {
       if (!state.marketRates || Object.keys(state.marketRates).length === 0) return state;
       return { ...state, assets: state.assets.map(a => revalueAsset(a, state.marketRates!)) };
@@ -297,7 +297,7 @@ export function AkceStoreProvider({
       onSyncStatusChange: setSyncStatus,
       onHydrateState: nextState => rawDispatch({ type: 'SYNC_HYDRATE_STATE', state: nextState }),
       onSubscriptionUpdate: update => rawDispatch({ type: 'SYNC_SUBSCRIPTION_UPDATE', update }),
-      onMarketRatesUpdate: rates => rawDispatch({ type: 'SYNC_MARKET_RATES_UPDATE', rates }),
+      onMarketRatesUpdate: (rates, updatedAt) => rawDispatch({ type: 'SYNC_MARKET_RATES_UPDATE', rates, updatedAt }),
       onAssetListsUpdate: lists => rawDispatch({ type: 'SYNC_ASSET_LISTS', lists }),
       onError: error => {
         if (import.meta.env.DEV) {

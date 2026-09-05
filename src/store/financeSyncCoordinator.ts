@@ -53,7 +53,7 @@ export interface FinanceSyncCoordinatorOptions {
   onSyncStatusChange?: (status: SyncStatus) => void;
   onHydrateState?: (state: AkceData) => void;
   onSubscriptionUpdate?: (update: FinanceSubscriptionUpdate) => void;
-  onMarketRatesUpdate?: (rates: MarketRatesData) => void;
+  onMarketRatesUpdate?: (rates: MarketRatesData, updatedAt: number) => void;
   onAssetListsUpdate?: (lists: AssetList[]) => void;
   onError?: (error: Error) => void;
 }
@@ -149,7 +149,7 @@ export class FinanceSyncCoordinator {
   private readonly onSyncStatusChange?: (status: SyncStatus) => void;
   private readonly onHydrateState?: (state: AkceData) => void;
   private readonly onSubscriptionUpdate?: (update: FinanceSubscriptionUpdate) => void;
-  private readonly onMarketRatesUpdate?: (rates: MarketRatesData) => void;
+  private readonly onMarketRatesUpdate?: (rates: MarketRatesData, updatedAt: number) => void;
   private readonly onAssetListsUpdate?: (lists: AssetList[]) => void;
   private readonly onErrorCallback?: (error: Error) => void;
 
@@ -675,7 +675,7 @@ export class FinanceSyncCoordinator {
 
     this.unsubscribeMarketRates = this.firebaseRepo.subscribeMarketRates(
       uid,
-      rates => this.onMarketRatesUpdate?.(rates),
+      (rates, updatedAt) => this.onMarketRatesUpdate?.(rates, updatedAt),
       error => this.handleRepositoryError(error),
     );
 

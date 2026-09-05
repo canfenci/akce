@@ -755,6 +755,14 @@ export function KurBilgileriScreen() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  useEffect(() => {
+    const updated: Record<string, string> = {};
+    for (const key of MARKET_RATE_KEYS) {
+      updated[key] = currentRates[key] !== undefined ? String(currentRates[key]) : '';
+    }
+    setForm(updated);
+  }, [state.marketRates]);
+
   const handleRateChange = (key: MarketRateKey, value: string) => {
     setForm(prev => ({ ...prev, [key]: sanitizeNumericInput(value) }));
     setSaved(false);
@@ -776,6 +784,11 @@ export function KurBilgileriScreen() {
     setSaved(true);
   };
 
+  const formatUpdatedAt = (timestamp?: number) => {
+    if (!timestamp) return '—';
+    return new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(timestamp));
+  };
+
   return <div className="screen">
     <PageHeader eyebrow="KUR BİLGİLERİ" title="Kur Bilgileri" description="Güncel kurları girerek bağlı varlıklarını otomatik olarak yeniden değerle." />
     <section className="settings-card">
@@ -795,6 +808,7 @@ export function KurBilgileriScreen() {
         </div>
       ))}
     </section>
+    <p className="rate-updated">Son güncelleme: {formatUpdatedAt(state.marketRatesUpdatedAt)}</p>
     {saved && <p className="rate-saved">Kurlar kaydedildi ve varlıklar güncellendi.</p>}
     <button className="primary-button" onClick={handleSave} disabled={saving}>
       {saving ? 'Kaydediliyor...' : 'Kurları Güncelle'}

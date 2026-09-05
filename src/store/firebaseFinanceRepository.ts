@@ -86,7 +86,7 @@ export class FirebaseFinanceRepository implements RealtimeFinanceRepository {
     return this.subscribeCollections(uid, globalCollections, collection => globalCollectionPath(uid, collection), onUpdate, onError);
   }
 
-  subscribeMarketRates(uid: string, onUpdate: (rates: MarketRatesData) => void, onError: (error: FinanceRepositoryError) => void) {
+  subscribeMarketRates(uid: string, onUpdate: (rates: MarketRatesData, updatedAt: number) => void, onError: (error: FinanceRepositoryError) => void) {
     const path = marketRatesPath(uid);
     const unsubscribeGateway = this.gateway.subscribeDocument(path, document => {
       try {
@@ -97,7 +97,8 @@ export class FirebaseFinanceRepository implements RealtimeFinanceRepository {
             rates[key] = value;
           }
         }
-        onUpdate(rates);
+        const updatedAt = typeof data.updatedAt === 'number' ? data.updatedAt : 0;
+        onUpdate(rates, updatedAt);
       } catch (error) {
         onError(normalizeRepositoryError(error));
       }
@@ -172,7 +173,7 @@ export class FirebaseFinanceRepository implements RealtimeFinanceRepository {
             ratesData[key] = value;
           }
           const operations: GatewayBatchOperation[] = [
-            { type: 'set', path: marketRatesPath(uid), data: { ...ratesData, schemaVersion: 2, deviceId: this.deviceId, updatedAt: now, createdAt: now, serverUpdatedAt: this.gateway.serverTimestamp() }, merge: true },
+            { type: 'set', path: marketRatesPath(uid), data: { ...ratesData, schemaVersion: 2, deviceId: this.deviceId, updatedAt: now, serverUpdatedAt: this.gateway.serverTimestamp() }, merge: true },
             ...mutation.assets.map(asset => ({ type: 'update' as const, path: globalDocumentPath(uid, 'assets', asset.id), data: this.updateDto(asset) })),
           ];
           await this.gateway.commitBatch(operations);

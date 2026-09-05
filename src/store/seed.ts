@@ -23,6 +23,7 @@ export interface AkceData {
   categoryBudgets: CategoryBudget[];
   assetSnapshots: AssetSnapshot[];
   marketRates?: Record<string, number>;
+  marketRatesUpdatedAt?: number;
   assetLists: AssetList[];
   settings: UserSettings;
 }

@@ -69,7 +69,7 @@ export interface RealtimeFinanceRepository extends FinanceRepository {
   readonly kind: 'firestore';
   subscribeSelectedMonth(uid: string, monthKey: string, onUpdate: (update: FinanceSubscriptionUpdate) => void, onError: (error: FinanceRepositoryError) => void): () => void;
   subscribeGlobals(uid: string, onUpdate: (update: FinanceSubscriptionUpdate) => void, onError: (error: FinanceRepositoryError) => void): () => void;
-  subscribeMarketRates(uid: string, onUpdate: (rates: MarketRatesData) => void, onError: (error: FinanceRepositoryError) => void): () => void;
+  subscribeMarketRates(uid: string, onUpdate: (rates: MarketRatesData, updatedAt: number) => void, onError: (error: FinanceRepositoryError) => void): () => void;
   subscribeAssetLists(uid: string, onUpdate: (lists: AssetList[]) => void, onError: (error: FinanceRepositoryError) => void): () => void;
   applyMutation(uid: string, mutation: FinanceMutation): Promise<void>;
   dispose(): void;
