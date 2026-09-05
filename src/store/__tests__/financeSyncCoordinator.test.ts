@@ -144,6 +144,7 @@ function createEmptyLocalState(): AkceData {
     assets: [],
     goals: [],
     assetSnapshots: [],
+    assetLists: [],
     settings: { ...seedData.settings },
   };
 }

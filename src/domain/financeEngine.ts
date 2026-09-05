@@ -224,3 +224,9 @@ export function revalueAsset(asset: Asset, rates: Record<string, number>): Asset
   const currentAmount = qty * unitPrice;
   return { ...asset, unitPrice, currentAmount, updatedAt: Date.now() };
 }
+
+export function getAssetListTotal(assets: Asset[], listId: string): number {
+  return assets
+    .filter(a => a.assetListId === listId)
+    .reduce((sum, a) => sum + (a.currentAmount || 0), 0);
+}

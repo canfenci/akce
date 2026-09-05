@@ -1,4 +1,4 @@
-import type { Asset, AssetSnapshot, CategoryBudget, Expense, FixedExpense, Goal, Income, Investment } from '../domain/types';
+import type { Asset, AssetList, AssetSnapshot, CategoryBudget, Expense, FixedExpense, Goal, Income, Investment } from '../domain/types';
 import type { AkceData } from './seed';
 
 export interface FinanceRepository {
@@ -58,6 +58,10 @@ export type FinanceMutation =
   | { type: 'asset.update'; value: Asset }
   | { type: 'asset.create'; value: Asset }
   | { type: 'asset.delete'; id: string }
+  | { type: 'assetList.create'; value: AssetList }
+  | { type: 'assetList.update'; value: AssetList }
+  | { type: 'assetList.delete'; id: string }
+  | { type: 'assetList.batchDelete'; id: string; assetsToUnlink: Asset[] }
   | { type: 'month.initialize'; value: MonthInitializationPayload }
   | { type: 'marketRates.update'; rates: MarketRatesData; assets: Asset[] };
 
@@ -66,6 +70,7 @@ export interface RealtimeFinanceRepository extends FinanceRepository {
   subscribeSelectedMonth(uid: string, monthKey: string, onUpdate: (update: FinanceSubscriptionUpdate) => void, onError: (error: FinanceRepositoryError) => void): () => void;
   subscribeGlobals(uid: string, onUpdate: (update: FinanceSubscriptionUpdate) => void, onError: (error: FinanceRepositoryError) => void): () => void;
   subscribeMarketRates(uid: string, onUpdate: (rates: MarketRatesData) => void, onError: (error: FinanceRepositoryError) => void): () => void;
+  subscribeAssetLists(uid: string, onUpdate: (lists: AssetList[]) => void, onError: (error: FinanceRepositoryError) => void): () => void;
   applyMutation(uid: string, mutation: FinanceMutation): Promise<void>;
   dispose(): void;
 }

@@ -1,5 +1,6 @@
 import type {
   Asset,
+  AssetList,
   AssetSnapshot,
   CategoryBudget,
   Expense,
@@ -53,6 +54,7 @@ export interface FinanceSyncCoordinatorOptions {
   onHydrateState?: (state: AkceData) => void;
   onSubscriptionUpdate?: (update: FinanceSubscriptionUpdate) => void;
   onMarketRatesUpdate?: (rates: MarketRatesData) => void;
+  onAssetListsUpdate?: (lists: AssetList[]) => void;
   onError?: (error: Error) => void;
 }
 
@@ -132,6 +134,7 @@ export class FinanceSyncCoordinator {
   private unsubscribeMonth: (() => void) | null = null;
   private unsubscribeGlobals: (() => void) | null = null;
   private unsubscribeMarketRates: (() => void) | null = null;
+  private unsubscribeAssetLists: (() => void) | null = null;
   private activeRepository: FinanceRepository;
   private migrationInProgress = false;
   private aborted = false;
@@ -147,6 +150,7 @@ export class FinanceSyncCoordinator {
   private readonly onHydrateState?: (state: AkceData) => void;
   private readonly onSubscriptionUpdate?: (update: FinanceSubscriptionUpdate) => void;
   private readonly onMarketRatesUpdate?: (rates: MarketRatesData) => void;
+  private readonly onAssetListsUpdate?: (lists: AssetList[]) => void;
   private readonly onErrorCallback?: (error: Error) => void;
 
   constructor(options: FinanceSyncCoordinatorOptions) {
@@ -160,6 +164,7 @@ export class FinanceSyncCoordinator {
     this.onHydrateState = options.onHydrateState;
     this.onSubscriptionUpdate = options.onSubscriptionUpdate;
     this.onMarketRatesUpdate = options.onMarketRatesUpdate;
+    this.onAssetListsUpdate = options.onAssetListsUpdate;
     this.onErrorCallback = options.onError;
 
     this.activeRepository = this.localRepo;
@@ -499,6 +504,7 @@ export class FinanceSyncCoordinator {
       goals: mergedGoals.merged,
       assetSnapshots: mergedSnapshots.merged,
       marketRates: localState.marketRates ?? {},
+      assetLists: localState.assetLists ?? [],
       settings: localState.settings,
     };
 
@@ -575,6 +581,7 @@ export class FinanceSyncCoordinator {
       goals: cloud.goals,
       assetSnapshots: cloud.assetSnapshots,
       marketRates: {},
+      assetLists: [],
       settings,
     };
   }
@@ -671,6 +678,12 @@ export class FinanceSyncCoordinator {
       rates => this.onMarketRatesUpdate?.(rates),
       error => this.handleRepositoryError(error),
     );
+
+    this.unsubscribeAssetLists = this.firebaseRepo.subscribeAssetLists(
+      uid,
+      lists => this.onAssetListsUpdate?.(lists),
+      error => this.handleRepositoryError(error),
+    );
   }
 
   switchSelectedMonth(monthKey: string): void {
@@ -742,6 +755,17 @@ export class FinanceSyncCoordinator {
       // Market rates may not exist; ignore
     }
 
+    // 5b. Delete asset lists
+    try {
+      const listDocs = (await this.gateway.getDocuments?.(`users/${uid}/assetLists`)) ?? [];
+      if (listDocs.length > 0) {
+        const listOps: GatewayBatchOperation[] = listDocs.map(d => ({ type: 'delete', path: `users/${uid}/assetLists/${d.id}` }));
+        await this.commitBatchesInChunks(listOps);
+      }
+    } catch {
+      // Asset lists may not exist; ignore
+    }
+
     // 6. Delete migration marker
     try {
       await this.gateway.deleteDocument(`users/${uid}/meta/migration`);
@@ -767,6 +791,8 @@ export class FinanceSyncCoordinator {
     this.unsubscribeGlobals = null;
     this.unsubscribeMarketRates?.();
     this.unsubscribeMarketRates = null;
+    this.unsubscribeAssetLists?.();
+    this.unsubscribeAssetLists = null;
     this.firebaseRepo.dispose();
   }
 

@@ -1,6 +1,6 @@
 import { getMonthKey } from '../domain/financeEngine';
 import { isMonthKey } from '../domain/month';
-import type { CategoryBudget } from '../domain/types';
+import type { AssetList, CategoryBudget } from '../domain/types';
 import { seedData, type AkceData } from './seed';
 import type { LocalFinanceRepository } from './financeRepository';
 
@@ -40,6 +40,7 @@ export const emptyFinanceState: AkceData = {
   goals: [],
   assetSnapshots: [],
   marketRates: {},
+  assetLists: [],
   settings: { ...seedData.settings, showOnboarding: false },
 };
 
@@ -63,11 +64,13 @@ export function migrateState(input: unknown, currentMonthKey: string = getMonthK
           ...a,
           priceSource: a.priceSource ?? 'manual',
           rateKey: a.rateKey,
+          assetListId: a.assetListId,
         }))
       : [],
     goals: Array.isArray(legacy.goals) ? legacy.goals : [],
     assetSnapshots: Array.isArray(legacy.assetSnapshots) ? legacy.assetSnapshots : [],
     marketRates: (legacy.marketRates && typeof legacy.marketRates === 'object') ? legacy.marketRates as Record<string, number> : {},
+    assetLists: Array.isArray((legacy as Record<string, unknown>).assetLists) ? (legacy as Record<string, unknown>).assetLists as AssetList[] : [],
     settings: legacy.settings ?? cloneSeed().settings,
   };
 }

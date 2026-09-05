@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type Dispatch, type ReactNode } from 'react';
-import type { Asset, AssetGroup, Expense, Income, FixedExpense, CategoryBudget, Investment, MarketRates } from '../domain/types';
+import type { Asset, AssetList, AssetGroup, Expense, Income, FixedExpense, CategoryBudget, Investment, MarketRates } from '../domain/types';
 import { seedData, type AkceData } from './seed';
 import { localStorageFinanceRepository, storageKey, emptyFinanceState } from './localStorageFinanceRepository';
 import { createFirebaseFinanceRepository } from './firebaseFinanceRepository';
@@ -40,7 +40,11 @@ export type Action =
   | { type: 'SYNC_SUBSCRIPTION_UPDATE'; update: FinanceSubscriptionUpdate }
   | { type: 'SYNC_MARKET_RATES_UPDATE'; rates: Record<string, number> }
   | { type: 'UPDATE_MARKET_RATES'; payload: MarketRates }
-  | { type: 'REVALUE_ASSETS' };
+  | { type: 'REVALUE_ASSETS' }
+  | { type: 'ADD_ASSET_LIST'; payload: AssetList }
+  | { type: 'UPDATE_ASSET_LIST'; payload: AssetList }
+  | { type: 'DELETE_ASSET_LIST'; id: string }
+  | { type: 'SYNC_ASSET_LISTS'; lists: AssetList[] };
 
 const copyId = (id: string, monthKey: string) => `${id.split('@')[0]}@${monthKey}`;
 
@@ -122,6 +126,10 @@ export function reducer(state: AkceData, action: Action): AkceData {
       if (!state.marketRates || Object.keys(state.marketRates).length === 0) return state;
       return { ...state, assets: state.assets.map(a => revalueAsset(a, state.marketRates!)) };
     }
+    case 'ADD_ASSET_LIST': return { ...state, assetLists: [action.payload, ...state.assetLists] };
+    case 'UPDATE_ASSET_LIST': return { ...state, assetLists: state.assetLists.map(item => item.id === action.payload.id ? action.payload : item) };
+    case 'DELETE_ASSET_LIST': return { ...state, assetLists: state.assetLists.filter(item => item.id !== action.id), assets: state.assets.map(a => a.assetListId === action.id ? { ...a, assetListId: undefined, updatedAt: Date.now() } : a) };
+    case 'SYNC_ASSET_LISTS': return { ...state, assetLists: action.lists };
     case 'SYNC_SUBSCRIPTION_UPDATE': {
       const { collection, items } = action.update;
       if (collection === 'assets' || collection === 'goals' || collection === 'assetSnapshots') {
@@ -248,6 +256,12 @@ export function mapActionToMutation(action: Action, currentState: AkceData): Fin
         assets: revalued,
       };
     }
+    case 'ADD_ASSET_LIST': return { type: 'assetList.create', value: action.payload };
+    case 'UPDATE_ASSET_LIST': return { type: 'assetList.update', value: action.payload };
+    case 'DELETE_ASSET_LIST': {
+      const assetsToUnlink = currentState.assets.filter(a => a.assetListId === action.id);
+      return { type: 'assetList.batchDelete', id: action.id, assetsToUnlink };
+    }
     default: return null;
   }
 }
@@ -284,6 +298,7 @@ export function AkceStoreProvider({
       onHydrateState: nextState => rawDispatch({ type: 'SYNC_HYDRATE_STATE', state: nextState }),
       onSubscriptionUpdate: update => rawDispatch({ type: 'SYNC_SUBSCRIPTION_UPDATE', update }),
       onMarketRatesUpdate: rates => rawDispatch({ type: 'SYNC_MARKET_RATES_UPDATE', rates }),
+      onAssetListsUpdate: lists => rawDispatch({ type: 'SYNC_ASSET_LISTS', lists }),
       onError: error => {
         if (import.meta.env.DEV) {
           console.error('[AKÇE Firestore sync]', getFirebaseErrorDetails(error));

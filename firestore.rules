@@ -101,6 +101,22 @@ service cloud.firestore {
         allow delete: if isOwner(uid);
       }
 
+      // Asset lists
+      match /assetLists/{assetListId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid)
+          && validSchemaVersion()
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 100;
+        allow update: if isOwner(uid)
+          && validSchemaVersion()
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 100;
+        allow delete: if isOwner(uid);
+      }
+
       // Monthly collections
       match /months/{monthKey} {
         // Reads must remain query-compatible. Firestore evaluates collection

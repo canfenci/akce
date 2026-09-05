@@ -39,3 +39,12 @@ export function globalDocumentPath(uid: string, collection: 'assets' | 'goals' |
 export function marketRatesPath(uid: string) {
   return `${userPath(uid)}/marketRates/current`;
 }
+
+export function assetListsPath(uid: string) {
+  return `${userPath(uid)}/assetLists`;
+}
+
+export function assetListDocumentPath(uid: string, assetListId: string) {
+  assertSegment(assetListId, 'belge kimliği');
+  return `${assetListsPath(uid)}/${assetListId}`;
+}

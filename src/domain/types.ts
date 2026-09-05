@@ -117,11 +117,20 @@ export interface Asset {
   valuationMode: ValuationMode;
   priceSource?: PriceSource;
   rateKey?: MarketRateKey;
+  assetListId?: string;
   quantity?: number;
   unit?: AssetUnit;
   unitPrice?: number;
   currentAmount: number;
   targetAmount: number;
+  createdAt: number;
+  updatedAt: number;
+  userId: string;
+}
+
+export interface AssetList {
+  id: string;
+  name: string;
   createdAt: number;
   updatedAt: number;
   userId: string;

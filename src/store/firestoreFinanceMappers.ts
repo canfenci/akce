@@ -1,4 +1,4 @@
-import type { Asset, AssetSnapshot, AssetGroup, AssetUnit, CategoryBudget, Expense, FixedExpense, Goal, Income, Investment, InvestmentGroup, PriceSource } from '../domain/types';
+import type { Asset, AssetList, AssetSnapshot, AssetGroup, AssetUnit, CategoryBudget, Expense, FixedExpense, Goal, Income, Investment, InvestmentGroup, PriceSource } from '../domain/types';
 import { isMonthKey } from '../domain/month';
 import { FinanceRepositoryError, type FinanceCollection, type FinanceCollectionMap } from './financeRepository';
 
@@ -75,6 +75,7 @@ export function fromFirestoreDto<K extends FinanceCollection>(collection: K, id:
       const valuationMode = (data.valuationMode === 'quantity' || data.valuationMode === 'direct') ? data.valuationMode as 'quantity' | 'direct' : 'direct';
       const priceSource: PriceSource = (data.priceSource === 'manual' || data.priceSource === 'rate') ? data.priceSource as PriceSource : 'manual';
       const rateKey = optionalString(data, 'rateKey') as Asset['rateKey'];
+      const assetListId = optionalString(data, 'assetListId');
       const cur = numberValue(data, 'currentAmount');
       let quantity = typeof data.quantity === 'number' && Number.isFinite(data.quantity) ? data.quantity : undefined;
       let unit = (typeof data.unit === 'string' && ['Adet', 'Gram', 'Pay', 'Lot', 'TL', 'USD', 'EUR', 'GBP', 'Ons', 'Diğer'].includes(data.unit)) ? data.unit as AssetUnit : undefined;
@@ -84,11 +85,33 @@ export function fromFirestoreDto<K extends FinanceCollection>(collection: K, id:
         unit = 'Adet';
         unitPrice = cur;
       }
-      value = { id, userId: uid, group, name, valuationMode, priceSource, rateKey, quantity, unit, unitPrice, currentAmount: cur, targetAmount: numberValue(data, 'targetAmount'), createdAt: metadataNumber(data, 'createdAt'), updatedAt: metadataNumber(data, 'updatedAt') };
+      value = { id, userId: uid, group, name, valuationMode, priceSource, rateKey, assetListId, quantity, unit, unitPrice, currentAmount: cur, targetAmount: numberValue(data, 'targetAmount'), createdAt: metadataNumber(data, 'createdAt'), updatedAt: metadataNumber(data, 'updatedAt') };
       break;
     }
     case 'goals': value = { id, userId: uid, assetGroupId: stringValue(data, 'assetGroupId'), targetAmount: numberValue(data, 'targetAmount'), createdAt: metadataNumber(data, 'createdAt'), updatedAt: metadataNumber(data, 'updatedAt') }; break;
     case 'assetSnapshots': value = { id, assetId: stringValue(data, 'assetId'), monthKey: monthKeyValue(data), amount: numberValue(data, 'amount'), createdAt: metadataNumber(data, 'createdAt') }; break;
   }
   return value as FinanceCollectionMap[K];
+}
+
+export function fromAssetListDto(id: string, uid: string, data: Record<string, unknown>): AssetList {
+  if (data.schemaVersion !== 2) invalid('schemaVersion');
+  return {
+    id,
+    userId: uid,
+    name: stringValue(data, 'name'),
+    createdAt: metadataNumber(data, 'createdAt'),
+    updatedAt: metadataNumber(data, 'updatedAt'),
+  };
+}
+
+export function toAssetListDto(value: AssetList, deviceId: string, serverUpdatedAt: unknown): FirestoreDto {
+  return {
+    name: value.name,
+    createdAt: value.createdAt,
+    updatedAt: value.updatedAt,
+    schemaVersion: 2,
+    deviceId,
+    serverUpdatedAt,
+  } as FirestoreDto;
 }

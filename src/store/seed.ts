@@ -1,5 +1,5 @@
 import { getMonthKey } from '../domain/financeEngine';
-import type { Asset, AssetSnapshot, CategoryBudget, Expense, FixedExpense, Goal, Income, Investment, UserSettings } from '../domain/types';
+import type { Asset, AssetList, AssetSnapshot, CategoryBudget, Expense, FixedExpense, Goal, Income, Investment, UserSettings } from '../domain/types';
 
 const now = new Date();
 const monthKey = getMonthKey(now);
@@ -23,6 +23,7 @@ export interface AkceData {
   categoryBudgets: CategoryBudget[];
   assetSnapshots: AssetSnapshot[];
   marketRates?: Record<string, number>;
+  assetLists: AssetList[];
   settings: UserSettings;
 }
 
@@ -68,5 +69,6 @@ export const seedData: AkceData = {
   ],
   assetSnapshots: [],
   marketRates: {},
+  assetLists: [],
   settings: { currency: 'TL', monthStartDay: 1, showOnboarding: true, ...common },
 };

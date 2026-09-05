@@ -32,6 +32,7 @@ describe('AKÇE-038: market rates & asset revaluation', () => {
         goals: [],
         assetSnapshots: [],
         marketRates: { USD_TRY: 38.5, GOLD_GRAM_TRY: 3200 },
+        assetLists: [],
         settings: { currency: 'TL', monthStartDay: 1, showOnboarding: false, createdAt: 1, updatedAt: 1, userId: 'u' },
       };
       const next = initializeMonth(state, '2026-08', '2026-09');
