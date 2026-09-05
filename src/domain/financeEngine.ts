@@ -1,4 +1,4 @@
-import { Expense, Income, FixedExpense, Investment, Asset, AssetList, MonthSummary } from '../domain/types';
+import { Expense, Income, FixedExpense, Investment, Asset, AssetList, MonthSummary, SAVINGS_INCOME_CATEGORIES } from '../domain/types';
 
 export function getMonthKey(date: Date = new Date()): string {
   const year = date.getFullYear();
@@ -260,7 +260,7 @@ export function getListlessAssets(assets: Asset[]): Asset[] {
 
 export function getExtraIncome(incomes: Income[], monthKey: string): number {
   return incomes
-    .filter(i => i.active && i.monthKey === monthKey && (i.name === 'Ek Ders' || i.name === 'Özel Ders'))
+    .filter(i => i.active && i.monthKey === monthKey && SAVINGS_INCOME_CATEGORIES.includes(i.category))
     .reduce((sum, i) => sum + i.amount, 0);
 }
 

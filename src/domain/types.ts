@@ -12,6 +12,32 @@ export interface Expense {
   userId: string;
 }
 
+export type IncomeCategory = 'salary' | 'extraLesson' | 'privateLesson' | 'rent' | 'sideJob' | 'dividend' | 'other';
+
+export const INCOME_CATEGORIES: IncomeCategory[] = ['salary', 'extraLesson', 'privateLesson', 'rent', 'sideJob', 'dividend', 'other'];
+
+export const INCOME_CATEGORY_LABELS: Record<IncomeCategory, string> = {
+  salary: 'Maaş',
+  extraLesson: 'Ek Ders',
+  privateLesson: 'Özel Ders',
+  rent: 'Kira',
+  sideJob: 'Ek İş',
+  dividend: 'Temettü',
+  other: 'Diğer',
+};
+
+export const SAVINGS_INCOME_CATEGORIES: IncomeCategory[] = ['extraLesson', 'privateLesson'];
+
+export function normalizeIncomeCategory(name: string): IncomeCategory {
+  const lower = name.toLowerCase();
+  if (lower.includes('maaş') || lower.includes('maas')) return 'salary';
+  if (lower.includes('ek ders')) return 'extraLesson';
+  if (lower.includes('özel ders') || lower.includes('ozel ders')) return 'privateLesson';
+  if (lower.includes('kira')) return 'rent';
+  if (lower.includes('temettü') || lower.includes('temettu')) return 'dividend';
+  return 'other';
+}
+
 export interface Income {
   id: string;
   name: string;
@@ -19,6 +45,7 @@ export interface Income {
   date: string;
   recurring: boolean;
   active: boolean;
+  category: IncomeCategory;
   monthKey: string;
   createdAt: number;
   updatedAt: number;

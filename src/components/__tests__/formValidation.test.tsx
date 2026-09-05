@@ -116,22 +116,24 @@ describe('Budget form validation', () => {
     const state = seedData;
     const action = {
       type: 'ADD_INCOME' as const,
-      payload: {
-        id: 'test-income-1',
-        name: 'Maaş',
-        amount: 50000,
-        date: '2026-09-01',
-        recurring: true,
-        active: true,
-        monthKey: '2026-09',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        userId: 'local-user',
-      },
-    };
-    const next = reducer(state, action);
-    expect(next.incomes.some(i => i.id === 'test-income-1')).toBe(true);
-  });
+        payload: {
+          id: 'test-income-1',
+          name: 'Maaş',
+          amount: 50000,
+          date: '2026-09-01',
+          recurring: true,
+          active: true,
+          monthKey: '2026-09',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          category: 'salary' as const,
+          userId: 'local-user',
+        },
+      };
+      const next = reducer(state, action);
+      expect(next.incomes.some(i => i.id === 'test-income-1')).toBe(true);
+    });
+
 
   it('reducer handles ADD_FIXED_EXPENSE action', () => {
     const state = seedData;

@@ -14,33 +14,33 @@ describe('AKÇE-047: Income-Derived Savings & Investment Allocation', () => {
   describe('getExtraIncome', () => {
     const monthKey = '2026-09';
 
-    it('sums Ek Ders and Özel Ders', () => {
+    it('sums Ek Ders and Özel Ders by category', () => {
       const incomes: Income[] = [
-        { id: '1', name: 'Ek Ders', amount: 15000, date: '2026-09-01', recurring: true, active: true, monthKey, createdAt: 0, updatedAt: 0, userId: 'u' },
-        { id: '2', name: 'Özel Ders', amount: 20000, date: '2026-09-01', recurring: true, active: true, monthKey, createdAt: 0, updatedAt: 0, userId: 'u' },
+        { id: '1', name: 'Ek Ders', amount: 15000, date: '2026-09-01', recurring: true, active: true, category: 'extraLesson', monthKey, createdAt: 0, updatedAt: 0, userId: 'u' },
+        { id: '2', name: 'Özel Ders', amount: 20000, date: '2026-09-01', recurring: true, active: true, category: 'privateLesson', monthKey, createdAt: 0, updatedAt: 0, userId: 'u' },
       ];
       expect(getExtraIncome(incomes, monthKey)).toBe(35000);
     });
 
     it('handles Ek Ders only', () => {
       const incomes: Income[] = [
-        { id: '1', name: 'Ek Ders', amount: 15000, date: '2026-09-01', recurring: true, active: true, monthKey, createdAt: 0, updatedAt: 0, userId: 'u' },
+        { id: '1', name: 'Ek Ders', amount: 15000, date: '2026-09-01', recurring: true, active: true, category: 'extraLesson', monthKey, createdAt: 0, updatedAt: 0, userId: 'u' },
       ];
       expect(getExtraIncome(incomes, monthKey)).toBe(15000);
     });
 
     it('handles Özel Ders only', () => {
       const incomes: Income[] = [
-        { id: '1', name: 'Özel Ders', amount: 20000, date: '2026-09-01', recurring: true, active: true, monthKey, createdAt: 0, updatedAt: 0, userId: 'u' },
+        { id: '1', name: 'Özel Ders', amount: 20000, date: '2026-09-01', recurring: true, active: true, category: 'privateLesson', monthKey, createdAt: 0, updatedAt: 0, userId: 'u' },
       ];
       expect(getExtraIncome(incomes, monthKey)).toBe(20000);
     });
 
-    it('sums multiple entries for same type', () => {
+    it('sums multiple entries for same category', () => {
       const incomes: Income[] = [
-        { id: '1', name: 'Ek Ders', amount: 10000, date: '2026-09-01', recurring: true, active: true, monthKey, createdAt: 0, updatedAt: 0, userId: 'u' },
-        { id: '2', name: 'Ek Ders', amount: 5000, date: '2026-09-01', recurring: true, active: true, monthKey, createdAt: 0, updatedAt: 0, userId: 'u' },
-        { id: '3', name: 'Özel Ders', amount: 20000, date: '2026-09-01', recurring: true, active: true, monthKey, createdAt: 0, updatedAt: 0, userId: 'u' },
+        { id: '1', name: 'Ek Ders', amount: 10000, date: '2026-09-01', recurring: true, active: true, category: 'extraLesson', monthKey, createdAt: 0, updatedAt: 0, userId: 'u' },
+        { id: '2', name: 'Ek Ders', amount: 5000, date: '2026-09-01', recurring: true, active: true, category: 'extraLesson', monthKey, createdAt: 0, updatedAt: 0, userId: 'u' },
+        { id: '3', name: 'Özel Ders', amount: 20000, date: '2026-09-01', recurring: true, active: true, category: 'privateLesson', monthKey, createdAt: 0, updatedAt: 0, userId: 'u' },
       ];
       expect(getExtraIncome(incomes, monthKey)).toBe(35000);
     });
@@ -51,14 +51,56 @@ describe('AKÇE-047: Income-Derived Savings & Investment Allocation', () => {
 
     it('ignores inactive incomes', () => {
       const incomes: Income[] = [
-        { id: '1', name: 'Ek Ders', amount: 15000, date: '2026-09-01', recurring: true, active: false, monthKey, createdAt: 0, updatedAt: 0, userId: 'u' },
+        { id: '1', name: 'Ek Ders', amount: 15000, date: '2026-09-01', recurring: true, active: false, category: 'extraLesson', monthKey, createdAt: 0, updatedAt: 0, userId: 'u' },
       ];
       expect(getExtraIncome(incomes, monthKey)).toBe(0);
     });
 
-    it('ignores other income types', () => {
+    it('excludes salary category', () => {
       const incomes: Income[] = [
-        { id: '1', name: 'Maaş', amount: 50000, date: '2026-09-01', recurring: true, active: true, monthKey, createdAt: 0, updatedAt: 0, userId: 'u' },
+        { id: '1', name: 'Maaş', amount: 50000, date: '2026-09-01', recurring: true, active: true, category: 'salary', monthKey, createdAt: 0, updatedAt: 0, userId: 'u' },
+      ];
+      expect(getExtraIncome(incomes, monthKey)).toBe(0);
+    });
+
+    it('excludes rent category', () => {
+      const incomes: Income[] = [
+        { id: '1', name: 'Kira Geliri', amount: 10000, date: '2026-09-01', recurring: true, active: true, category: 'rent', monthKey, createdAt: 0, updatedAt: 0, userId: 'u' },
+      ];
+      expect(getExtraIncome(incomes, monthKey)).toBe(0);
+    });
+
+    it('excludes sideJob category', () => {
+      const incomes: Income[] = [
+        { id: '1', name: 'Ek İş', amount: 10000, date: '2026-09-01', recurring: true, active: true, category: 'sideJob', monthKey, createdAt: 0, updatedAt: 0, userId: 'u' },
+      ];
+      expect(getExtraIncome(incomes, monthKey)).toBe(0);
+    });
+
+    it('excludes dividend category', () => {
+      const incomes: Income[] = [
+        { id: '1', name: 'Temettü', amount: 10000, date: '2026-09-01', recurring: true, active: true, category: 'dividend', monthKey, createdAt: 0, updatedAt: 0, userId: 'u' },
+      ];
+      expect(getExtraIncome(incomes, monthKey)).toBe(0);
+    });
+
+    it('excludes other category', () => {
+      const incomes: Income[] = [
+        { id: '1', name: 'Diğer', amount: 10000, date: '2026-09-01', recurring: true, active: true, category: 'other', monthKey, createdAt: 0, updatedAt: 0, userId: 'u' },
+      ];
+      expect(getExtraIncome(incomes, monthKey)).toBe(0);
+    });
+
+    it('income named ABC with category extraLesson is included', () => {
+      const incomes: Income[] = [
+        { id: '1', name: 'ABC', amount: 15000, date: '2026-09-01', recurring: true, active: true, category: 'extraLesson', monthKey, createdAt: 0, updatedAt: 0, userId: 'u' },
+      ];
+      expect(getExtraIncome(incomes, monthKey)).toBe(15000);
+    });
+
+    it('income named Ek Ders with category other is NOT included', () => {
+      const incomes: Income[] = [
+        { id: '1', name: 'Ek Ders', amount: 15000, date: '2026-09-01', recurring: true, active: true, category: 'other', monthKey, createdAt: 0, updatedAt: 0, userId: 'u' },
       ];
       expect(getExtraIncome(incomes, monthKey)).toBe(0);
     });

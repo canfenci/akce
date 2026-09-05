@@ -1,4 +1,5 @@
-import type { Asset, AssetList, AssetSnapshot, AssetGroup, AssetUnit, CategoryBudget, Expense, FixedExpense, Goal, Income, Investment, InvestmentGroup, PriceSource } from '../domain/types';
+import type { Asset, AssetList, AssetSnapshot, AssetGroup, AssetUnit, CategoryBudget, Expense, FixedExpense, Goal, Income, IncomeCategory, Investment, InvestmentGroup, PriceSource } from '../domain/types';
+import { INCOME_CATEGORIES, normalizeIncomeCategory } from '../domain/types';
 import { isMonthKey } from '../domain/month';
 import { FinanceRepositoryError, type FinanceCollection, type FinanceCollectionMap } from './financeRepository';
 
@@ -53,7 +54,15 @@ export function fromFirestoreDto<K extends FinanceCollection>(collection: K, id:
   let value: Expense | Income | FixedExpense | Investment | CategoryBudget | Asset | Goal | AssetSnapshot;
   switch (collection) {
     case 'expenses': value = { id, userId: uid, amount: numberValue(data, 'amount'), category: stringValue(data, 'category'), type: enumValue(data, 'type', ['zorunlu', 'isteğe bağlı', 'plansız']), paymentMethod: enumValue(data, 'paymentMethod', ['kart', 'nakit']), note: optionalString(data, 'note'), date: stringValue(data, 'date'), monthKey: monthKeyValue(data), createdAt: metadataNumber(data, 'createdAt'), updatedAt: metadataNumber(data, 'updatedAt') }; break;
-    case 'incomes': value = { id, userId: uid, name: stringValue(data, 'name'), amount: numberValue(data, 'amount'), date: stringValue(data, 'date'), recurring: booleanValue(data, 'recurring'), active: booleanValue(data, 'active'), monthKey: monthKeyValue(data), createdAt: metadataNumber(data, 'createdAt'), updatedAt: metadataNumber(data, 'updatedAt') }; break;
+    case 'incomes': {
+      const name = stringValue(data, 'name');
+      const rawCategory = data.category;
+      const category: IncomeCategory = typeof rawCategory === 'string' && INCOME_CATEGORIES.includes(rawCategory as IncomeCategory)
+        ? rawCategory as IncomeCategory
+        : normalizeIncomeCategory(name);
+      value = { id, userId: uid, name, amount: numberValue(data, 'amount'), date: stringValue(data, 'date'), recurring: booleanValue(data, 'recurring'), active: booleanValue(data, 'active'), category, monthKey: monthKeyValue(data), createdAt: metadataNumber(data, 'createdAt'), updatedAt: metadataNumber(data, 'updatedAt') };
+      break;
+    }
     case 'fixedExpenses': value = { id, userId: uid, name: stringValue(data, 'name'), amount: numberValue(data, 'amount'), dueDay: numberValue(data, 'dueDay'), category: stringValue(data, 'category'), frequency: enumValue(data, 'frequency', ['monthly', 'yearly']), active: booleanValue(data, 'active'), monthKey: monthKeyValue(data), createdAt: metadataNumber(data, 'createdAt'), updatedAt: metadataNumber(data, 'updatedAt') }; break;
     case 'investments': {
       const groupRaw = stringValue(data, 'group');

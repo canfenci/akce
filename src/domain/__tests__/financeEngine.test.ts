@@ -56,7 +56,7 @@ describe('Finance Engine', () => {
   describe('calculateMonthSummary', () => {
     it('should calculate daily safe limit correctly', () => {
       const incomes: Income[] = [
-        { id: '1', name: 'Maaş', amount: 50000, date: '2024-01-01', recurring: true, active: true, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
+        { id: '1', name: 'Maaş', amount: 50000, date: '2024-01-01', recurring: true, active: true, category: 'salary', monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
       ];
       
       const fixedExpenses: FixedExpense[] = [
@@ -92,7 +92,7 @@ describe('Finance Engine', () => {
 
     it('should exclude investment from spendable budget', () => {
       const incomes: Income[] = [
-        { id: '1', name: 'Maaş', amount: 30000, date: '2024-01-01', recurring: true, active: true, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
+        { id: '1', name: 'Maaş', amount: 30000, date: '2024-01-01', recurring: true, active: true, category: 'salary', monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
       ];
       
       const fixedExpenses: FixedExpense[] = [];
@@ -115,7 +115,7 @@ describe('Finance Engine', () => {
 
     it('should calculate unplanned expense ratio', () => {
       const incomes: Income[] = [
-        { id: '1', name: 'Maaş', amount: 30000, date: '2024-01-01', recurring: true, active: true, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
+        { id: '1', name: 'Maaş', amount: 30000, date: '2024-01-01', recurring: true, active: true, category: 'salary', monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
       ];
       
       const fixedExpenses: FixedExpense[] = [];
@@ -138,7 +138,7 @@ describe('Finance Engine', () => {
 
     it('should calculate 7-day average', () => {
       const incomes: Income[] = [
-        { id: '1', name: 'Maaş', amount: 30000, date: '2024-01-01', recurring: true, active: true, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
+        { id: '1', name: 'Maaş', amount: 30000, date: '2024-01-01', recurring: true, active: true, category: 'salary', monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
       ];
       
       const fixedExpenses: FixedExpense[] = [];
@@ -164,7 +164,7 @@ expect(summary.sevenDayAverage).toBe(1500);
    describe('monthEndEstimate', () => {
      it('should use 7-day average when available', () => {
        const incomes: Income[] = [
-         { id: '1', name: 'Maaş', amount: 50000, date: '2024-01-01', recurring: true, active: true, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
+         { id: '1', name: 'Maaş', amount: 50000, date: '2024-01-01', recurring: true, active: true, category: 'salary', monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
        ];
        
        const fixedExpenses: FixedExpense[] = [];
@@ -193,7 +193,7 @@ expect(summary.sevenDayAverage).toBe(1500);
      
      it('should use 0 when no expense data', () => {
        const incomes: Income[] = [
-         { id: '1', name: 'Maaş', amount: 50000, date: '2024-01-01', recurring: true, active: true, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
+         { id: '1', name: 'Maaş', amount: 50000, date: '2024-01-01', recurring: true, active: true, category: 'salary', monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
        ];
        
        const fixedExpenses: FixedExpense[] = [];
@@ -213,7 +213,7 @@ expect(summary.sevenDayAverage).toBe(1500);
      
      it('should use totalVariableExpenses when daysLeft is 0', () => {
        const incomes: Income[] = [
-         { id: '1', name: 'Maaş', amount: 50000, date: '2024-01-31', recurring: true, active: true, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
+         { id: '1', name: 'Maaş', amount: 50000, date: '2024-01-31', recurring: true, active: true, category: 'salary', monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
        ];
        
        const fixedExpenses: FixedExpense[] = [];
@@ -236,7 +236,7 @@ expect(summary.sevenDayAverage).toBe(1500);
      it('should be deterministic regardless of remainingBudget sign', () => {
        // Case 1: positive remainingBudget
        const incomes1: Income[] = [
-         { id: '1', name: 'Maaş', amount: 50000, date: '2024-01-01', recurring: true, active: true, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
+         { id: '1', name: 'Maaş', amount: 50000, date: '2024-01-01', recurring: true, active: true, category: 'salary', monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
        ];
        
        const fixedExpenses1: FixedExpense[] = [
@@ -257,7 +257,7 @@ expect(summary.sevenDayAverage).toBe(1500);
        
        // Case 2: negative remainingBudget (higher expenses)
        const incomes2: Income[] = [
-         { id: '1', name: 'Maaş', amount: 20000, date: '2024-01-01', recurring: true, active: true, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
+         { id: '1', name: 'Maaş', amount: 20000, date: '2024-01-01', recurring: true, active: true, category: 'salary', monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'user1' }
        ];
        
        const fixedExpenses2: FixedExpense[] = [
@@ -411,8 +411,8 @@ expect(summary.sevenDayAverage).toBe(1500);
 
   describe('dailySafeLimit edge cases', () => {
     const incomes: Income[] = [
-      { id: '1', name: 'Maaş', amount: 70000, date: '2024-09-01', recurring: true, active: true, monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' },
-      { id: '2', name: 'Ek Ders', amount: 30000, date: '2024-09-01', recurring: true, active: true, monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' },
+      { id: '1', name: 'Maaş', amount: 70000, date: '2024-09-01', recurring: true, active: true, category: 'salary', monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' },
+      { id: '2', name: 'Ek Ders', amount: 30000, date: '2024-09-01', recurring: true, active: true, category: 'extraLesson', monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' },
     ];
     const fixedExpenses: FixedExpense[] = [
       { id: '1', name: 'Kira', amount: 26000, dueDay: 1, category: 'Konut', frequency: 'monthly', active: true, monthKey: '2024-09', createdAt: 1, updatedAt: 1, userId: 'u' }
@@ -486,7 +486,7 @@ expect(summary.sevenDayAverage).toBe(1500);
         { id: '1', amount: 10000, category: 'Market', type: 'zorunlu', paymentMethod: 'kart', date: '2024-08-15', monthKey: '2024-08', createdAt: 1, updatedAt: 1, userId: 'u' }
       ];
       const augIncomes: Income[] = [
-        { id: '1', name: 'Maaş', amount: 80000, date: '2024-08-01', recurring: true, active: true, monthKey: '2024-08', createdAt: 1, updatedAt: 1, userId: 'u' }
+        { id: '1', name: 'Maaş', amount: 80000, date: '2024-08-01', recurring: true, active: true, category: 'salary', monthKey: '2024-08', createdAt: 1, updatedAt: 1, userId: 'u' }
       ];
       // Aug 31 is the last day of August
       const summary = calculateMonthSummary(augIncomes, [], [], expenses, [], new Date('2024-08-31'));
@@ -636,7 +636,7 @@ expect(summary.sevenDayAverage).toBe(1500);
 
     it('investmentPlanRealizationRate uses actualAmount not completed flag', () => {
       const incomes: Income[] = [
-        { id: '1', name: 'Maaş', amount: 100000, date: '2024-01-01', recurring: true, active: true, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'u' }
+        { id: '1', name: 'Maaş', amount: 100000, date: '2024-01-01', recurring: true, active: true, category: 'salary', monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'u' }
       ];
       const investments: Investment[] = [
         { id: '1', group: 'TEFAS', name: 'TP2', plannedAmount: 7500, actualAmount: 5000, completed: false, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'u' },
@@ -653,8 +653,8 @@ expect(summary.sevenDayAverage).toBe(1500);
 
     it('remainingBudget uses netInvestment not plannedAmount', () => {
       const incomes: Income[] = [
-        { id: '1', name: 'Maaş', amount: 70000, date: '2024-01-01', recurring: true, active: true, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'u' },
-        { id: '2', name: 'Ek Ders', amount: 30000, date: '2024-01-01', recurring: true, active: true, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'u' },
+        { id: '1', name: 'Maaş', amount: 70000, date: '2024-01-01', recurring: true, active: true, category: 'salary', monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'u' },
+        { id: '2', name: 'Ek Ders', amount: 30000, date: '2024-01-01', recurring: true, active: true, category: 'extraLesson', monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'u' },
       ];
       const investments: Investment[] = [
         { id: '1', group: 'TEFAS', name: 'TP2', plannedAmount: 20000, actualAmount: 15000, completed: false, monthKey: '2024-01', createdAt: 1, updatedAt: 1, userId: 'u' },

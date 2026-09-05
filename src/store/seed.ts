@@ -32,9 +32,9 @@ export const seedData: AkceData = {
   schemaVersion: 2,
   selectedMonthKey: monthKey,
   incomes: [
-    { id: 'income-1', name: 'Maaş', amount: 82000, date: dateAgo(1), recurring: true, active: true, monthKey, ...common },
-    { id: 'income-2', name: 'Ek ders', amount: 18000, date: dateAgo(1), recurring: true, active: true, monthKey, ...common },
-    { id: 'income-3', name: 'Özel ders', amount: 10000, date: dateAgo(1), recurring: false, active: true, monthKey, ...common },
+    { id: 'income-1', name: 'Maaş', amount: 82000, date: dateAgo(1), recurring: true, active: true, category: 'salary', monthKey, ...common },
+    { id: 'income-2', name: 'Ek ders', amount: 18000, date: dateAgo(1), recurring: true, active: true, category: 'extraLesson', monthKey, ...common },
+    { id: 'income-3', name: 'Özel ders', amount: 10000, date: dateAgo(1), recurring: false, active: true, category: 'privateLesson', monthKey, ...common },
   ],
   fixedExpenses: [
     { id: 'fixed-1', name: 'Kira', amount: 20500, dueDay: 3, category: 'Konut', frequency: 'monthly', active: true, monthKey, ...common },

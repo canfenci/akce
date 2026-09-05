@@ -1,6 +1,7 @@
 import { getMonthKey } from '../domain/financeEngine';
 import { isMonthKey } from '../domain/month';
-import type { AssetList, CategoryBudget } from '../domain/types';
+import type { AssetList, CategoryBudget, Income, IncomeCategory } from '../domain/types';
+import { INCOME_CATEGORIES, normalizeIncomeCategory } from '../domain/types';
 import { seedData, type AkceData } from './seed';
 import type { LocalFinanceRepository } from './financeRepository';
 
@@ -20,10 +21,12 @@ export function clearEmptyStateMarker(storage: Pick<Storage, 'removeItem'> = loc
 }
 
 type LegacyCategoryBudget = Omit<CategoryBudget, 'monthKey'> & { monthKey?: string };
+type LegacyIncome = Omit<Income, 'category'> & { category?: IncomeCategory };
 type LegacyData = Partial<Omit<AkceData, 'schemaVersion' | 'selectedMonthKey' | 'categoryBudgets'>> & {
   schemaVersion?: number;
   selectedMonthKey?: string;
   categoryBudgets?: LegacyCategoryBudget[];
+  incomes?: LegacyIncome[];
 };
 
 const cloneSeed = (): AkceData => JSON.parse(JSON.stringify(seedData)) as AkceData;
@@ -51,11 +54,19 @@ export function migrateState(input: unknown, currentMonthKey: string = getMonthK
   const normalizeMonth = <T extends { monthKey?: string }>(items: T[] | undefined): (T & { monthKey: string })[] =>
     (Array.isArray(items) ? items : []).map(item => ({ ...item, monthKey: isMonthKey(item.monthKey) ? item.monthKey : currentMonthKey }));
 
+  const normalizeIncomes = (items: LegacyIncome[] | undefined): Income[] =>
+    normalizeMonth(items).map(item => ({
+      ...item,
+      category: typeof item.category === 'string' && INCOME_CATEGORIES.includes(item.category as IncomeCategory)
+        ? item.category as IncomeCategory
+        : normalizeIncomeCategory(item.name),
+    }));
+
   return {
     schemaVersion: 2,
     selectedMonthKey,
     expenses: normalizeMonth(legacy.expenses),
-    incomes: normalizeMonth(legacy.incomes),
+    incomes: normalizeIncomes(legacy.incomes),
     fixedExpenses: normalizeMonth(legacy.fixedExpenses),
     investments: normalizeMonth(legacy.investments),
     categoryBudgets: normalizeMonth(legacy.categoryBudgets),
